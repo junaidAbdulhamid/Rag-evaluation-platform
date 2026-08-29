@@ -12,6 +12,7 @@ import re
 
 from app.generation.generator import LLMGenerator
 from app.ingestion.embeddings import EmbeddingProvider
+from app.llm import LLMTextResponse, TextLLM
 from app.models import GeneratedAnswer, RetrievedChunk, TokenUsage
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
@@ -59,4 +60,21 @@ class EchoGenerator(LLMGenerator):
             model="echo-generator",
             token_usage=TokenUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
             prompt="(fake prompt)",
+        )
+
+
+class FakeTextLLM(TextLLM):
+    """Returns scripted responses in order; the last one repeats. Records prompts."""
+
+    def __init__(self, responses: str | list[str]) -> None:
+        self._responses = [responses] if isinstance(responses, str) else list(responses)
+        self.calls: list[str] = []
+
+    def complete(self, prompt, *, system=None, max_tokens=1024, effort="low") -> LLMTextResponse:
+        self.calls.append(prompt)
+        index = min(len(self.calls) - 1, len(self._responses) - 1)
+        return LLMTextResponse(
+            text=self._responses[index],
+            model="fake-text-llm",
+            token_usage=TokenUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
         )
