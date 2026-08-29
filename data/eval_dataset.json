@@ -1,0 +1,218 @@
+[
+  {
+    "id": "q001",
+    "question": "How many days do customers have to request a refund?",
+    "expected_answer": "Customers have 30 days from the delivery date to request a refund.",
+    "relevant_document_ids": ["refund_policy"],
+    "category": "refunds",
+    "difficulty": "easy",
+    "slices": ["simple_lookup", "numerical", "policy"]
+  },
+  {
+    "id": "q002",
+    "question": "How long does it take to process an approved refund?",
+    "expected_answer": "Approved refunds are processed within 5 to 7 business days.",
+    "relevant_document_ids": ["refund_policy"],
+    "category": "refunds",
+    "difficulty": "easy",
+    "slices": ["numerical", "policy"]
+  },
+  {
+    "id": "q003",
+    "question": "Can I get a refund on a digital product I have already downloaded?",
+    "expected_answer": "No. Digital goods are non-refundable once they have been downloaded.",
+    "relevant_document_ids": ["refund_policy"],
+    "category": "refunds",
+    "difficulty": "medium",
+    "slices": ["simple_lookup", "policy"]
+  },
+  {
+    "id": "q004",
+    "question": "Is there a fee for returning opened electronics?",
+    "expected_answer": "Yes. Opened electronics are subject to a 15% restocking fee.",
+    "relevant_document_ids": ["refund_policy"],
+    "category": "refunds",
+    "difficulty": "medium",
+    "slices": ["numerical", "policy"]
+  },
+  {
+    "id": "q005",
+    "question": "How much does express shipping cost and how long does it take?",
+    "expected_answer": "Express shipping costs $14.99 and is delivered in 1 to 2 business days.",
+    "relevant_document_ids": ["shipping_policy"],
+    "category": "shipping",
+    "difficulty": "easy",
+    "slices": ["simple_lookup", "numerical"]
+  },
+  {
+    "id": "q006",
+    "question": "What is the minimum order total for free standard shipping?",
+    "expected_answer": "Standard shipping is free on orders over $50.",
+    "relevant_document_ids": ["shipping_policy"],
+    "category": "shipping",
+    "difficulty": "easy",
+    "slices": ["numerical"]
+  },
+  {
+    "id": "q007",
+    "question": "Which countries can orders be shipped to?",
+    "expected_answer": "Orders ship to the United States and Canada only.",
+    "relevant_document_ids": ["shipping_policy"],
+    "category": "shipping",
+    "difficulty": "easy",
+    "slices": ["simple_lookup", "policy"]
+  },
+  {
+    "id": "q008",
+    "question": "By what time must an order be placed to qualify for overnight delivery?",
+    "expected_answer": "The order must be placed by 2:00pm ET.",
+    "relevant_document_ids": ["shipping_policy"],
+    "category": "shipping",
+    "difficulty": "medium",
+    "slices": ["numerical"]
+  },
+  {
+    "id": "q009",
+    "question": "How long does delivery to Canada take?",
+    "expected_answer": "Delivery to Canada takes 7 to 10 business days.",
+    "relevant_document_ids": ["shipping_policy"],
+    "category": "shipping",
+    "difficulty": "easy",
+    "slices": ["simple_lookup", "numerical"]
+  },
+  {
+    "id": "q010",
+    "question": "How long is the standard limited warranty?",
+    "expected_answer": "The standard limited warranty lasts 12 months from the date of purchase.",
+    "relevant_document_ids": ["warranty_policy"],
+    "category": "warranty",
+    "difficulty": "easy",
+    "slices": ["simple_lookup", "numerical", "policy"]
+  },
+  {
+    "id": "q011",
+    "question": "Does the warranty cover water damage?",
+    "expected_answer": "No. Accidental damage, drops, and liquid or water damage are not covered.",
+    "relevant_document_ids": ["warranty_policy"],
+    "category": "warranty",
+    "difficulty": "medium",
+    "slices": ["policy"]
+  },
+  {
+    "id": "q012",
+    "question": "How much does the extended warranty cost and how much coverage does it add?",
+    "expected_answer": "The extended warranty costs $39.99 and adds 24 months of coverage.",
+    "relevant_document_ids": ["warranty_policy"],
+    "category": "warranty",
+    "difficulty": "medium",
+    "slices": ["numerical"]
+  },
+  {
+    "id": "q013",
+    "question": "How long are rechargeable batteries covered under warranty?",
+    "expected_answer": "Rechargeable batteries are covered for the first 6 months only.",
+    "relevant_document_ids": ["warranty_policy"],
+    "category": "warranty",
+    "difficulty": "medium",
+    "slices": ["numerical", "policy"]
+  },
+  {
+    "id": "q014",
+    "question": "When is my payment card charged for an order?",
+    "expected_answer": "Your card is charged when the order ships, not when the order is placed.",
+    "relevant_document_ids": ["payment_methods"],
+    "category": "payments",
+    "difficulty": "easy",
+    "slices": ["simple_lookup", "policy"]
+  },
+  {
+    "id": "q015",
+    "question": "Can I pay in installments, and is there a minimum order amount?",
+    "expected_answer": "Yes. Orders over $100 can be split into 4 interest-free payments through Affirm.",
+    "relevant_document_ids": ["payment_methods"],
+    "category": "payments",
+    "difficulty": "medium",
+    "slices": ["numerical", "policy"]
+  },
+  {
+    "id": "q016",
+    "question": "Do you accept bank wire transfers?",
+    "expected_answer": "No. Paper checks, money orders, and bank wire transfers are not accepted.",
+    "relevant_document_ids": ["payment_methods"],
+    "category": "payments",
+    "difficulty": "easy",
+    "slices": ["policy"]
+  },
+  {
+    "id": "q017",
+    "question": "What are the password requirements?",
+    "expected_answer": "Passwords must be at least 12 characters long and include at least one number and one symbol.",
+    "relevant_document_ids": ["account_security"],
+    "category": "account",
+    "difficulty": "easy",
+    "slices": ["simple_lookup", "numerical", "policy"]
+  },
+  {
+    "id": "q018",
+    "question": "What happens after 5 failed sign-in attempts?",
+    "expected_answer": "The account is locked for 30 minutes.",
+    "relevant_document_ids": ["account_security"],
+    "category": "account",
+    "difficulty": "easy",
+    "slices": ["numerical", "policy"]
+  },
+  {
+    "id": "q019",
+    "question": "How long does a password reset link stay valid?",
+    "expected_answer": "A password reset link is valid for 1 hour.",
+    "relevant_document_ids": ["account_security"],
+    "category": "account",
+    "difficulty": "easy",
+    "slices": ["simple_lookup", "numerical"]
+  },
+  {
+    "id": "q020",
+    "question": "How much does the Pro plan cost and what does it add compared to Plus?",
+    "expected_answer": "The Pro plan costs $19.99 per month and adds 5% cashback on purchases and priority customer support on top of the Plus benefits.",
+    "relevant_document_ids": ["membership_plans"],
+    "category": "membership",
+    "difficulty": "medium",
+    "slices": ["numerical", "policy"]
+  },
+  {
+    "id": "q021",
+    "question": "As a Plus member, how much do I pay for standard shipping on a $30 order?",
+    "expected_answer": "Nothing. Plus membership includes free standard shipping on every order.",
+    "relevant_document_ids": ["membership_plans", "shipping_policy"],
+    "category": "membership",
+    "difficulty": "hard",
+    "slices": ["multi_document", "numerical", "policy"]
+  },
+  {
+    "id": "q022",
+    "question": "Does the Pro free trial require a credit card?",
+    "expected_answer": "Yes. A payment card is required to start the 14-day Pro free trial, and it is charged when the trial ends unless you cancel first.",
+    "relevant_document_ids": ["membership_plans"],
+    "category": "membership",
+    "difficulty": "medium",
+    "slices": ["policy"]
+  },
+  {
+    "id": "q023",
+    "question": "Do you offer price matching if I find a lower price elsewhere?",
+    "expected_answer": "The provided context is insufficient to answer this question.",
+    "relevant_document_ids": [],
+    "category": "unsupported",
+    "difficulty": "hard",
+    "slices": ["unanswerable", "adversarial"]
+  },
+  {
+    "id": "q024",
+    "question": "How do I permanently delete my account?",
+    "expected_answer": "The provided context is insufficient to answer this question.",
+    "relevant_document_ids": [],
+    "category": "unsupported",
+    "difficulty": "medium",
+    "slices": ["unanswerable"]
+  }
+]

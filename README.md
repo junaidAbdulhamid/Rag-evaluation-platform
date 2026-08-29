@@ -9,7 +9,7 @@ learning project.
 | Phase | Scope | State |
 |------:|-------|-------|
 | 1 | Minimal RAG pipeline (load → chunk → embed → store → retrieve → generate) | ✅ done |
-| 2 | Golden evaluation dataset | ⬜ |
+| 2 | Golden evaluation dataset | ✅ done |
 | 3 | Retrieval evaluation (Hit@K, Precision@K, Recall@K, MRR, NDCG) | ⬜ |
 | 4 | Generation evaluation (correctness, relevance; LLM-as-judge) | ⬜ |
 | 5 | Faithfulness evaluation (claim extraction + grounding) | ⬜ |
@@ -41,9 +41,13 @@ app/
   generation/
     prompt.py               system prompt + grounded prompt builder
     generator.py            LLMGenerator ABC + AnthropicGenerator
+  evaluation/
+    dataset.py              EvalExample model + EvalDataset container + JSON loader
 data/documents/             sample corpus (6 policy docs)
+data/eval_dataset.json      24 labelled ground-truth questions
 scripts/ask.py              Phase 1 CLI
-tests/                      unit tests for loader, chunker, vector store, retriever, pipeline
+scripts/show_dataset.py     Phase 2 CLI (dataset summary / iteration demo)
+tests/                      unit tests per module
 ```
 
 Flow: `Documents → Loader → Chunker → Embeddings → VectorStore`, then
@@ -64,6 +68,9 @@ The embedding model (~90 MB) downloads automatically on first use.
 ```bash
 python -m scripts.ask -q "How many days do I have to request a refund?"
 python -m scripts.ask -q "How much is express shipping?" --top-k 3 --show-prompt
+
+python -m scripts.show_dataset                       # dataset summary
+python -m scripts.show_dataset --slice multi_document --full
 ```
 
 ## Test
