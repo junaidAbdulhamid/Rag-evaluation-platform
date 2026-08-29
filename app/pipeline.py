@@ -20,7 +20,7 @@ from app.generation.generator import AnthropicGenerator, LLMGenerator
 from app.ingestion.chunker import TextChunker
 from app.ingestion.embeddings import EmbeddingProvider, SentenceTransformerEmbeddingProvider
 from app.ingestion.loader import load_documents
-from app.models import IngestionResult, RagResult
+from app.models import IngestionResult, RagResult, RetrievedChunk
 from app.retrieval.retriever import BaseRetriever, DenseRetriever
 from app.retrieval.vector_store import InMemoryVectorStore, VectorStore
 
@@ -32,9 +32,11 @@ class RagPipeline:
         embeddings: EmbeddingProvider,
         vector_store: VectorStore,
         retriever: BaseRetriever,
-        generator: LLMGenerator,
+        generator: LLMGenerator | None = None,
         default_top_k: int = 4,
     ) -> None:
+        # `generator` is optional: a retrieval-only pipeline (Phase 3 eval, Phase 9
+        # tracing) can be built without paying for an LLM. `answer()` guards on it.
         self.chunker = chunker
         self.embeddings = embeddings
         self.vector_store = vector_store
@@ -56,10 +58,20 @@ class RagPipeline:
             document_ids=[doc.document_id for doc in documents],
         )
 
+    def retrieve(self, question: str, top_k: int | None = None) -> list[RetrievedChunk]:
+        """Run only the retrieval half of the pipeline (no LLM call).
+
+        Phase 3's retrieval evaluation and Phase 9's tracing both need context
+        without paying for generation.
+        """
+        k = top_k if top_k is not None else self.default_top_k
+        return self.retriever.retrieve(question, k)
+
     def answer(self, question: str, top_k: int | None = None) -> RagResult:
         """Retrieve context for `question`, then generate a grounded answer."""
-        k = top_k if top_k is not None else self.default_top_k
-        retrieved = self.retriever.retrieve(question, k)
+        if self.generator is None:
+            raise RuntimeError("pipeline has no generator; it can only .retrieve()")
+        retrieved = self.retrieve(question, top_k)
         generated = self.generator.generate(question, retrieved)
         return RagResult(
             question=question,

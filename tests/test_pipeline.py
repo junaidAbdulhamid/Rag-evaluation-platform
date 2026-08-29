@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from app.ingestion.chunker import TextChunker
 from app.pipeline import RagPipeline
 from app.retrieval.retriever import DenseRetriever
@@ -64,3 +66,25 @@ def test_answer_top_k_override_beats_default(tmp_path: Path):
     pipeline.answer("shipping time?", top_k=1)
 
     assert len(generator.calls[-1][1]) == 1
+
+
+def test_retrieve_returns_ranked_chunks_without_calling_generator(tmp_path: Path):
+    pipeline, generator = build_pipeline(tmp_path)
+    pipeline.ingest(str(tmp_path))
+
+    chunks = pipeline.retrieve("How do I request a refund?", top_k=2)
+
+    assert [c.rank for c in chunks] == [1, 2]
+    assert chunks[0].chunk.document_id == "refund_policy"
+    assert generator.calls == []  # generation was not invoked
+
+
+def test_generatorless_pipeline_can_retrieve_but_not_answer(tmp_path: Path):
+    pipeline, _ = build_pipeline(tmp_path)
+    pipeline.generator = None
+    pipeline.ingest(str(tmp_path))
+
+    assert pipeline.retrieve("refund", top_k=1)  # fine
+
+    with pytest.raises(RuntimeError, match="no generator"):
+        pipeline.answer("refund")
