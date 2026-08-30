@@ -2,8 +2,17 @@
 
 from app.generation.generator import AnthropicGenerator
 from app.generation.prompt import INSUFFICIENT_CONTEXT_REPLY, build_rag_prompt
+from app.llm import _supports_effort
 from app.models import Chunk, RetrievedChunk
 from tests.fakes import FakeTextLLM
+
+
+def test_supports_effort_only_for_capable_models():
+    assert _supports_effort("claude-opus-5") is True
+    assert _supports_effort("claude-sonnet-5") is True
+    assert _supports_effort("claude-opus-4-6") is True
+    assert _supports_effort("claude-haiku-4-5") is False
+    assert _supports_effort("claude-sonnet-4-5") is False
 
 
 def chunk(doc_id: str, text: str, rank: int) -> RetrievedChunk:

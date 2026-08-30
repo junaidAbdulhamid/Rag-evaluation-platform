@@ -41,6 +41,20 @@ class TextLLM(ABC):
         """Send one user prompt, return the model's text plus token usage."""
 
 
+# Substrings of model ids that accept `output_config.effort`. Opus 4.5+, Sonnet 5,
+# and the 4.6+ family support it; Haiku 4.5, Sonnet 4.5, and older reject it with a
+# 400. Passing effort is an optimisation, not a requirement, so we just drop it for
+# models that can't take it.
+_EFFORT_MODEL_MARKERS = (
+    "opus-5", "opus-4-8", "opus-4-7", "opus-4-6", "opus-4-5",
+    "sonnet-5", "sonnet-4-6", "fable-5", "mythos-5",
+)
+
+
+def _supports_effort(model: str) -> bool:
+    return any(marker in model for marker in _EFFORT_MODEL_MARKERS)
+
+
 class AnthropicTextLLM(TextLLM):
     """The single place the Anthropic client is constructed and called."""
 
@@ -63,9 +77,10 @@ class AnthropicTextLLM(TextLLM):
         kwargs = {
             "model": self._model,
             "max_tokens": max_tokens,
-            "output_config": {"effort": effort},
             "messages": [{"role": "user", "content": prompt}],
         }
+        if _supports_effort(self._model):
+            kwargs["output_config"] = {"effort": effort}
         if system is not None:
             kwargs["system"] = system
 
