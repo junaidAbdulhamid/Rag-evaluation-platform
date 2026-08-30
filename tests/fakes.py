@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import re
 
+from app.evaluation.citation import CitationEvaluationResult, CitationEvaluator
 from app.evaluation.faithfulness import FaithfulnessEvaluator, FaithfulnessResult
 from app.generation.generator import LLMGenerator
 from app.ingestion.embeddings import EmbeddingProvider
@@ -89,5 +90,17 @@ class FakeFaithfulnessEvaluator(FaithfulnessEvaluator):
         self.calls: list[str] = []
 
     def evaluate(self, *, answer, retrieved) -> FaithfulnessResult:
+        self.calls.append(answer)
+        return self._by_answer[answer]
+
+
+class FakeCitationEvaluator(CitationEvaluator):
+    """Returns a canned CitationEvaluationResult keyed by the answer string."""
+
+    def __init__(self, by_answer: dict[str, CitationEvaluationResult]) -> None:
+        self._by_answer = by_answer
+        self.calls: list[str] = []
+
+    def evaluate(self, *, answer, retrieved) -> CitationEvaluationResult:
         self.calls.append(answer)
         return self._by_answer[answer]

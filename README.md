@@ -13,7 +13,7 @@ learning project.
 | 3 | Retrieval evaluation (Hit@K, Precision@K, Recall@K, MRR, NDCG) | ✅ done |
 | 4 | Generation evaluation (correctness, relevance; LLM-as-judge) | ✅ done |
 | 5 | Faithfulness evaluation (claim extraction + grounding) | ✅ done |
-| 6 | Citation-grounded RAG + citation metrics | ⬜ |
+| 6 | Citation-grounded RAG + citation metrics | ✅ done |
 | 7 | Experiment configuration system | ⬜ |
 | 8 | Experiment tracking (SQLite) | ⬜ |
 | 9 | Observability & tracing | ⬜ |
@@ -42,6 +42,7 @@ app/
   generation/
     prompt.py               system prompt + grounded prompt builder
     generator.py            LLMGenerator ABC + AnthropicGenerator
+    citation.py             CitedGenerator: [n] markers tied to retrieved chunks
   evaluation/
     dataset.py              EvalExample model + EvalDataset container + JSON loader
     retrieval_metrics.py    pure from-scratch metrics: Hit/Precision/Recall/RR/DCG/NDCG @k
@@ -52,6 +53,8 @@ app/
     structured_output.py    shared JSON-extract + validate + retry helper for LLM calls
     faithfulness.py         claim extraction + verification vs numbered context; chunk-id linkage
     faithfulness_eval.py    per-question + macro/micro aggregate, dataset driver
+    citation.py             citation precision / completeness / correctness / hallucination
+    citation_eval.py        per-question + macro/micro aggregate, dataset driver
 data/documents/             sample corpus (6 policy docs)
 data/eval_dataset.json      24 labelled ground-truth questions
 scripts/ask.py              Phase 1 CLI
@@ -59,6 +62,7 @@ scripts/show_dataset.py     Phase 2 CLI (dataset summary / iteration demo)
 scripts/eval_retrieval.py   Phase 3 CLI (retrieval metrics + worst questions)
 scripts/eval_generation.py  Phase 4 CLI (deterministic + judge, --no-judge / --limit)
 scripts/eval_faithfulness.py Phase 5 CLI (claim-level grounding, --limit)
+scripts/eval_citations.py   Phase 6 CLI (cited answers + citation metrics, --limit)
 tests/                      unit tests per module
 ```
 
@@ -91,6 +95,7 @@ python -m scripts.eval_generation --no-judge         # deterministic scorers onl
 python -m scripts.eval_generation --limit 5          # + LLM judge on the first 5 questions
 
 python -m scripts.eval_faithfulness --limit 5        # claim-level grounding vs retrieved context
+python -m scripts.eval_citations --limit 5           # cited answers + citation precision/completeness
 ```
 
 ## Test

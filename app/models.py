@@ -59,6 +59,25 @@ class GeneratedAnswer(BaseModel):
     )
 
 
+class Citation(BaseModel):
+    """One inline `[n]` marker in a cited answer, resolved against the retrieved set."""
+
+    marker: int = Field(description="The number written in the answer, e.g. 2 for '[2]'.")
+    exists: bool = Field(description="True if `marker` maps to a real retrieved chunk (1..k).")
+    chunk_id: Optional[str] = None      # None when the marker is out of range (hallucinated)
+    document_id: Optional[str] = None
+
+
+class CitedAnswer(BaseModel):
+    """A generated answer that carries inline `[n]` citation markers."""
+
+    answer: str                        # full text, markers included
+    citations: list[Citation]          # one per distinct marker used, resolved
+    model: str
+    token_usage: Optional[TokenUsage] = None
+    prompt: Optional[str] = None
+
+
 class RagResult(BaseModel):
     """Everything produced by one end-to-end pipeline run for one question."""
 
