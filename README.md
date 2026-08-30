@@ -12,7 +12,7 @@ learning project.
 | 2 | Golden evaluation dataset | ✅ done |
 | 3 | Retrieval evaluation (Hit@K, Precision@K, Recall@K, MRR, NDCG) | ✅ done |
 | 4 | Generation evaluation (correctness, relevance; LLM-as-judge) | ✅ done |
-| 5 | Faithfulness evaluation (claim extraction + grounding) | ⬜ |
+| 5 | Faithfulness evaluation (claim extraction + grounding) | ✅ done |
 | 6 | Citation-grounded RAG + citation metrics | ⬜ |
 | 7 | Experiment configuration system | ⬜ |
 | 8 | Experiment tracking (SQLite) | ⬜ |
@@ -49,12 +49,16 @@ app/
     generation_metrics.py   deterministic scorers: exact_match, token_f1, number_coverage, abstention
     judge.py                LLM-as-judge: strict GenerationJudgement model + parse/retry loop
     generation.py           deterministic + judge per-question + aggregate, dataset driver
+    structured_output.py    shared JSON-extract + validate + retry helper for LLM calls
+    faithfulness.py         claim extraction + verification vs numbered context; chunk-id linkage
+    faithfulness_eval.py    per-question + macro/micro aggregate, dataset driver
 data/documents/             sample corpus (6 policy docs)
 data/eval_dataset.json      24 labelled ground-truth questions
 scripts/ask.py              Phase 1 CLI
 scripts/show_dataset.py     Phase 2 CLI (dataset summary / iteration demo)
 scripts/eval_retrieval.py   Phase 3 CLI (retrieval metrics + worst questions)
 scripts/eval_generation.py  Phase 4 CLI (deterministic + judge, --no-judge / --limit)
+scripts/eval_faithfulness.py Phase 5 CLI (claim-level grounding, --limit)
 tests/                      unit tests per module
 ```
 
@@ -85,6 +89,8 @@ python -m scripts.eval_retrieval --top-k 1 --worst 3 # see the precision/recall 
 
 python -m scripts.eval_generation --no-judge         # deterministic scorers only (1 API call/Q)
 python -m scripts.eval_generation --limit 5          # + LLM judge on the first 5 questions
+
+python -m scripts.eval_faithfulness --limit 5        # claim-level grounding vs retrieved context
 ```
 
 ## Test

@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import re
 
+from app.evaluation.faithfulness import FaithfulnessEvaluator, FaithfulnessResult
 from app.generation.generator import LLMGenerator
 from app.ingestion.embeddings import EmbeddingProvider
 from app.llm import LLMTextResponse, TextLLM
@@ -78,3 +79,15 @@ class FakeTextLLM(TextLLM):
             model="fake-text-llm",
             token_usage=TokenUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
         )
+
+
+class FakeFaithfulnessEvaluator(FaithfulnessEvaluator):
+    """Returns a canned FaithfulnessResult keyed by the answer string."""
+
+    def __init__(self, by_answer: dict[str, FaithfulnessResult]) -> None:
+        self._by_answer = by_answer
+        self.calls: list[str] = []
+
+    def evaluate(self, *, answer, retrieved) -> FaithfulnessResult:
+        self.calls.append(answer)
+        return self._by_answer[answer]
