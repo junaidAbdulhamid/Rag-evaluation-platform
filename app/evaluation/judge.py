@@ -3,9 +3,9 @@
 The judge reads (question, reference answer, generated answer) and returns two
 scores in [0, 1] - ``correctness`` and ``relevance`` - each with a one-sentence
 rationale. Output is a strict Pydantic model: the score fields are range-validated,
-unknown keys are rejected, and blank reasoning is rejected. Anything that fails to
-parse triggers a retry with a "your last output was invalid" nudge; after
-``max_retries`` the call raises ``JudgeParseError`` rather than returning garbage.
+unknown keys are rejected, and blank reasoning is rejected. The parse + retry loop
+is shared with the faithfulness evaluator (see ``structured_output.py``); when it
+gives up it raises ``JudgeParseError``.
 
 The judge depends on the ``TextLLM`` seam, so a test injects a fake that returns
 canned strings and the retry / parse logic is exercised with no network.
@@ -13,11 +13,15 @@ canned strings and the retry / parse logic is exercised with no network.
 
 from __future__ import annotations
 
-import json
 from abc import ABC, abstractmethod
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.evaluation.structured_output import (
+    StructuredOutputError,
+    parse_model,
+    retry_structured_call,
+)
 from app.llm import TextLLM
 
 JUDGE_SYSTEM = (
@@ -50,11 +54,6 @@ Scoring guidance:
 Respond with ONLY this JSON object, no code fences, no extra text:
 {{"correctness": <float 0-1>, "relevance": <float 0-1>, "correctness_reasoning": "<one sentence>", "relevance_reasoning": "<one sentence>"}}"""
 
-_RETRY_SUFFIX = (
-    "\n\nYour previous response could not be parsed ({error}). "
-    "Respond with ONLY the JSON object described above - no prose, no code fences."
-)
-
 
 class GenerationJudgement(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -72,7 +71,7 @@ class GenerationJudgement(BaseModel):
         return value.strip()
 
 
-class JudgeParseError(RuntimeError):
+class JudgeParseError(StructuredOutputError):
     """Raised when the judge never returns parseable structured output."""
 
 
@@ -84,22 +83,9 @@ def build_judge_prompt(question: str, expected_answer: str, generated_answer: st
     )
 
 
-def _extract_json_object(text: str) -> str:
-    """Pull the outermost {...} out of a response that may have fences or prose."""
-    text = text.strip()
-    if text.startswith("```"):
-        text = text.strip("`")
-        if text[:4].lower() == "json":
-            text = text[4:]
-    start, end = text.find("{"), text.rfind("}")
-    if start == -1 or end == -1 or end < start:
-        raise json.JSONDecodeError("no JSON object found in response", text or "", 0)
-    return text[start : end + 1]
-
-
 def parse_judgement(text: str) -> GenerationJudgement:
     """str -> GenerationJudgement, raising JSONDecodeError or ValidationError."""
-    return GenerationJudgement.model_validate(json.loads(_extract_json_object(text)))
+    return parse_model(text, GenerationJudgement)
 
 
 class GenerationJudge(ABC):
@@ -119,19 +105,12 @@ class LLMGenerationJudge(GenerationJudge):
         self, *, question: str, expected_answer: str, generated_answer: str
     ) -> GenerationJudgement:
         prompt = build_judge_prompt(question, expected_answer, generated_answer)
-        suffix = ""
-        last_error: Exception | None = None
-
-        for _attempt in range(self._max_retries + 1):
-            response = self._llm.complete(
-                prompt + suffix, system=JUDGE_SYSTEM, max_tokens=600, effort="medium"
-            )
-            try:
-                return parse_judgement(response.text)
-            except (json.JSONDecodeError, ValidationError) as error:
-                last_error = error
-                suffix = _RETRY_SUFFIX.format(error=error)
-
-        raise JudgeParseError(
-            f"judge produced invalid output after {self._max_retries + 1} attempts: {last_error}"
+        return retry_structured_call(
+            self._llm,
+            prompt=prompt,
+            response_model=GenerationJudgement,
+            system=JUDGE_SYSTEM,
+            max_tokens=600,
+            max_retries=self._max_retries,
+            error_cls=JudgeParseError,
         )
