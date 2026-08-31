@@ -4,7 +4,7 @@ import time
 
 from app.experiment.cost import estimate_cost
 from app.experiment.metering import RecordingTextLLM, TokenMeter, add_usage
-from app.experiment.timing import record_ms
+from app.observability.timing import record_ms
 from app.models import TokenUsage
 from tests.fakes import FakeTextLLM
 

@@ -120,6 +120,17 @@ def test_full_run_populates_every_section(corpus_dir: Path):
     assert result.total_token_usage.total_tokens == 34
     assert result.estimated_cost_usd > 0.0
 
+    # Phase 9: a full trace per question
+    assert len(result.traces) == 2
+    trace = result.traces[0]
+    assert trace.question_id == "q1"
+    assert trace.retrieval is not None and trace.retrieval.chunks
+    assert trace.retrieval.chunks[0].score is not None  # scores captured, not just ids
+    assert trace.generation is not None and trace.generation.prompt == "(fixed prompt)"
+    assert trace.evaluation is not None and trace.evaluation.correctness is not None
+    assert trace.performance.total_ms >= 0.0
+    assert trace.performance.token_usage.total_tokens == 17
+
 
 def test_evaluator_toggles_are_respected(corpus_dir: Path):
     comps, _ = build_components()
@@ -133,6 +144,16 @@ def test_evaluator_toggles_are_respected(corpus_dir: Path):
     assert q.faithfulness is None and q.citation is None
     assert q.generation is not None and q.generation.judgement is None  # deterministic only
     assert result.faithfulness is None and result.citation is None
+
+
+def test_tracing_can_be_disabled(corpus_dir: Path):
+    comps, _ = build_components()
+    result = run_experiment(
+        base_config(documents_dir=str(corpus_dir), tracing_enabled=False),
+        components=comps,
+        dataset=dataset(),
+    )
+    assert result.traces == []
 
 
 def test_per_question_error_is_isolated(corpus_dir: Path):
@@ -155,6 +176,9 @@ def test_per_question_error_is_isolated(corpus_dir: Path):
     # q1 still fully evaluated; aggregates computed over the survivor
     assert result.per_question[0].ok
     assert result.generation is not None and result.generation.num_questions == 1
+    # both a full trace (q1) and an error-only trace (q2) are emitted
+    assert len(result.traces) == 2
+    assert not [t for t in result.traces if t.question_id == "q2"][0].ok
 
 
 def test_save_and_load_round_trip(corpus_dir: Path):

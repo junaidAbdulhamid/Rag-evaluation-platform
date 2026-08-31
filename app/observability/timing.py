@@ -1,5 +1,5 @@
-"""Stage timing. A deliberately tiny helper - Phase 9 (tracing) and Phase 10
-(latency percentiles) build richer structures on top of the same idea."""
+"""Stage timing. A deliberately tiny helper; the trace recorder and the experiment
+runner both use it."""
 
 from __future__ import annotations
 

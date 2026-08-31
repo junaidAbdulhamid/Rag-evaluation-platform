@@ -24,6 +24,7 @@ from pydantic import BaseModel
 
 from app.config import settings
 from app.experiment.results import ExperimentResult, QuestionExperimentResult
+from app.observability.trace import Trace
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS experiments (
@@ -103,6 +104,19 @@ CREATE TABLE IF NOT EXISTS question_results (
 );
 
 CREATE INDEX IF NOT EXISTS ix_qr_experiment ON question_results(experiment_id);
+
+CREATE TABLE IF NOT EXISTS traces (
+    trace_id      TEXT PRIMARY KEY,
+    experiment_id TEXT NOT NULL REFERENCES experiments(experiment_id) ON DELETE CASCADE,
+    question_id   TEXT,
+    total_ms      REAL,
+    total_tokens  INTEGER,
+    estimated_cost_usd REAL,
+    has_error     INTEGER NOT NULL,
+    trace_json    TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_traces_experiment ON traces(experiment_id);
 """
 
 
@@ -175,6 +189,15 @@ class ExperimentStore:
                     f"INSERT INTO question_results ({q_cols}) VALUES ({q_ph})", q_row
                 )
 
+            self._conn.execute(
+                "DELETE FROM traces WHERE experiment_id = ?", (result.experiment_id,)
+            )
+            for trace in result.traces:
+                t_row = self._trace_row(result.experiment_id, trace)
+                t_cols = ", ".join(t_row)
+                t_ph = ", ".join(f":{c}" for c in t_row)
+                self._conn.execute(f"INSERT INTO traces ({t_cols}) VALUES ({t_ph})", t_row)
+
     def delete(self, experiment_id: str) -> bool:
         with self._conn:
             cur = self._conn.execute(
@@ -224,6 +247,18 @@ class ExperimentStore:
         if row is None:
             return None
         return ExperimentResult.model_validate_json(row["result_json"])
+
+    def get_traces(self, experiment_id: str) -> list[Trace]:
+        rows = self._conn.execute(
+            "SELECT trace_json FROM traces WHERE experiment_id = ? ORDER BY rowid", (experiment_id,)
+        ).fetchall()
+        return [Trace.model_validate_json(r["trace_json"]) for r in rows]
+
+    def get_trace(self, trace_id: str) -> Optional[Trace]:
+        row = self._conn.execute(
+            "SELECT trace_json FROM traces WHERE trace_id = ?", (trace_id,)
+        ).fetchone()
+        return Trace.model_validate_json(row["trace_json"]) if row else None
 
     # -- row builders --------------------------------------------------------------------
     @staticmethod
@@ -291,4 +326,17 @@ class ExperimentStore:
             "total_tokens": q.token_usage.total_tokens,
             "estimated_cost_usd": q.estimated_cost_usd,
             "detail_json": q.model_dump_json(),
+        }
+
+    @staticmethod
+    def _trace_row(experiment_id: str, trace: Trace) -> dict:
+        return {
+            "trace_id": trace.trace_id,
+            "experiment_id": experiment_id,
+            "question_id": trace.question_id,
+            "total_ms": trace.performance.total_ms,
+            "total_tokens": trace.performance.token_usage.total_tokens,
+            "estimated_cost_usd": trace.performance.estimated_cost_usd,
+            "has_error": int(bool(trace.errors)),
+            "trace_json": trace.model_dump_json(),
         }

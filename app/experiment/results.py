@@ -21,6 +21,7 @@ from app.evaluation.generation import AggregateGenerationMetrics, QuestionGenera
 from app.evaluation.retrieval import AggregateRetrievalMetrics, QuestionRetrievalResult
 from app.experiment.config import ExperimentConfig
 from app.models import TokenUsage
+from app.observability.trace import Trace
 
 
 class LatencySummary(BaseModel):
@@ -72,6 +73,7 @@ class ExperimentResult(BaseModel):
     chunk_count: int
 
     per_question: list[QuestionExperimentResult]
+    traces: list[Trace] = Field(default_factory=list)
 
     retrieval: Optional[AggregateRetrievalMetrics] = None
     generation: Optional[AggregateGenerationMetrics] = None

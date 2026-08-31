@@ -49,6 +49,9 @@ class ExperimentConfig(BaseModel):
     judge_model: Optional[str] = None   # defaults to generation_model
     max_retries: int = 2
 
+    # --- observability ---
+    tracing_enabled: bool = True        # emit a full Trace per question
+
     # --- data / limits ---
     documents_dir: Optional[str] = None
     dataset_path: Optional[str] = None

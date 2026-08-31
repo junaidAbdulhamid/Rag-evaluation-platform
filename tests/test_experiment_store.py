@@ -27,6 +27,13 @@ from app.evaluation.retrieval import (
     RetrievalMetrics,
 )
 from app.models import TokenUsage
+from app.observability.trace import (
+    GenerationTrace,
+    PerformanceTrace,
+    RetrievalTrace,
+    Trace,
+    TracedChunk,
+)
 
 
 def make_result(experiment_id: str = "exp_1", *, recall: float = 0.9) -> ExperimentResult:
@@ -60,6 +67,23 @@ def make_result(experiment_id: str = "exp_1", *, recall: float = 0.9) -> Experim
         token_usage=TokenUsage(prompt_tokens=100, completion_tokens=20, total_tokens=120),
         estimated_cost_usd=0.001,
     )
+    trace = Trace(
+        trace_id=f"{experiment_id}_t1",
+        question="How long for a refund?",
+        question_id="q1",
+        started_at="2026-08-30T10:00:00+00:00",
+        retrieval=RetrievalTrace(
+            query="How long for a refund?", top_k=4, embedding_dim=384,
+            chunks=[TracedChunk(rank=1, score=0.8, chunk_id="refund_policy::chunk_0",
+                                document_id="refund_policy", text_preview="Customers have 30 days...")],
+        ),
+        generation=GenerationTrace(model="claude-opus-5", prompt="Context: ...", answer="30 days."),
+        performance=PerformanceTrace(
+            retrieval_ms=5.0, generation_ms=800.0, evaluation_ms=900.0, total_ms=1705.0,
+            token_usage=TokenUsage(prompt_tokens=100, completion_tokens=20, total_tokens=120),
+            estimated_cost_usd=0.001,
+        ),
+    )
     return ExperimentResult(
         experiment_id=experiment_id,
         config=ExperimentConfig(experiment_name="base", chunk_size=500, top_k=4),
@@ -70,6 +94,7 @@ def make_result(experiment_id: str = "exp_1", *, recall: float = 0.9) -> Experim
         document_count=6,
         chunk_count=12,
         per_question=[q],
+        traces=[trace],
         retrieval=AggregateRetrievalMetrics(
             k=4, num_questions_total=1, num_questions_scored=1, hit_rate=1.0, precision=0.5,
             recall=recall, mrr=1.0, ndcg=1.0,
@@ -144,14 +169,32 @@ def test_question_rows_store_queryable_columns(store: ExperimentStore):
     assert row["latency_total_ms"] == 1705.0
 
 
-def test_delete_cascades_to_question_rows(store: ExperimentStore):
+def test_delete_cascades_to_question_and_trace_rows(store: ExperimentStore):
     store.save(make_result("exp_del"))
     assert store.delete("exp_del") is True
     assert store.get("exp_del") is None
-    assert store._conn.execute(
-        "SELECT COUNT(*) FROM question_results WHERE experiment_id = 'exp_del'"
-    ).fetchone()[0] == 0
+    for table in ("question_results", "traces"):
+        n = store._conn.execute(
+            f"SELECT COUNT(*) FROM {table} WHERE experiment_id = 'exp_del'"
+        ).fetchone()[0]
+        assert n == 0
     assert store.delete("exp_del") is False  # already gone
+
+
+def test_traces_persist_and_load(store: ExperimentStore):
+    store.save(make_result("exp_tr"))
+
+    traces = store.get_traces("exp_tr")
+    assert [t.question_id for t in traces] == ["q1"]
+    assert traces[0].retrieval.chunks[0].chunk_id == "refund_policy::chunk_0"
+
+    one = store.get_trace("exp_tr_t1")
+    assert one is not None and one.generation.model == "claude-opus-5"
+    assert store.get_trace("missing") is None
+
+    # re-save replaces trace rows, no duplicates
+    store.save(make_result("exp_tr"))
+    assert len(store.get_traces("exp_tr")) == 1
 
 
 def test_errored_question_persists_with_null_metrics(store: ExperimentStore):

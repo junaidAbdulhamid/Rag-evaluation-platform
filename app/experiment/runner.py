@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from uuid import uuid4
 
 from app.config import settings
 from app.evaluation.citation import CitationEvaluator, LLMCitationEvaluator
@@ -49,7 +50,9 @@ from app.experiment.results import (
     LatencySummary,
     QuestionExperimentResult,
 )
-from app.experiment.timing import record_ms
+from app.observability.recorder import TraceRecorder
+from app.observability.timing import record_ms
+from app.observability.trace import PerformanceTrace, Trace
 from app.generation.citation import AnthropicCitedGenerator, CitedGenerator
 from app.generation.generator import AnthropicGenerator, LLMGenerator
 from app.ingestion.chunker import TextChunker
@@ -134,27 +137,32 @@ def build_experiment_components(
 
 
 def _generate(question: str, retrieved, config: ExperimentConfig, comps: ExperimentComponents):
-    """Return (answer_text, token_usage) from the plain or cited generator."""
+    """Return the full GeneratedAnswer / CitedAnswer from the plain or cited generator."""
     if config.citations_enabled:
-        cited = comps.cited_generator.generate(question, list(retrieved))
-        return cited.answer, cited.token_usage
+        return comps.cited_generator.generate(question, list(retrieved))
     gen: LLMGenerator = comps.pipeline.generator
-    answer = gen.generate(question, list(retrieved))
-    return answer.answer, answer.token_usage
+    return gen.generate(question, list(retrieved))
 
 
 def _run_one(
     example: EvalExample, config: ExperimentConfig, comps: ExperimentComponents
-) -> QuestionExperimentResult:
+) -> tuple[QuestionExperimentResult, Optional[Trace]]:
     latency: dict = {}
     meter_before = comps.eval_meter.snapshot()
+    recorder = (
+        TraceRecorder(example.question, example.id, latency=latency)
+        if config.tracing_enabled
+        else None
+    )
 
     with record_ms(latency, "total"):
         with record_ms(latency, "retrieval"):
             retrieved = comps.pipeline.retrieve(example.question, config.top_k)
 
         with record_ms(latency, "generation"):
-            answer_text, gen_usage = _generate(example.question, retrieved, config, comps)
+            answer = _generate(example.question, retrieved, config, comps)
+            answer_text = answer.answer
+            gen_usage = answer.token_usage
 
         with record_ms(latency, "evaluation"):
             retrieval_res = (
@@ -192,7 +200,7 @@ def _run_one(
         eval_usage, comps.judge_model
     )
 
-    return QuestionExperimentResult(
+    result = QuestionExperimentResult(
         question_id=example.id,
         question=example.question,
         retrieved_chunk_ids=[rc.chunk.chunk_id for rc in retrieved],
@@ -206,6 +214,33 @@ def _run_one(
         token_usage=question_usage,
         estimated_cost_usd=cost,
     )
+
+    trace = None
+    if recorder is not None:
+        recorder.record_retrieval(
+            query=example.question,
+            retrieved=retrieved,
+            top_k=config.top_k,
+            embedding_model=config.embedding_model,
+            embedding_dim=getattr(comps.pipeline.embeddings, "dimension", None),
+        )
+        recorder.record_generation(
+            model=answer.model,
+            prompt=answer.prompt or "",
+            answer=answer_text,
+            token_usage=answer.token_usage,
+            citations=getattr(answer, "citations", None),
+        )
+        recorder.record_evaluation(
+            retrieval_metrics=retrieval_res.metrics if retrieval_res else None,
+            judgement=generation_res.judgement if generation_res else None,
+            deterministic=generation_res.deterministic if generation_res else None,
+            faithfulness=faithfulness_res.result if faithfulness_res else None,
+            citation=citation_res.result if citation_res else None,
+        )
+        trace = recorder.build(token_usage=question_usage, estimated_cost_usd=cost)
+
+    return result, trace
 
 
 def _mean(values) -> float:
@@ -237,10 +272,14 @@ def run_experiment(
         examples = examples[: config.limit]
 
     per_question: list[QuestionExperimentResult] = []
+    traces: list[Trace] = []
     errors: list[ExperimentError] = []
     for example in examples:
         try:
-            per_question.append(_run_one(example, config, comps))
+            question_result, trace = _run_one(example, config, comps)
+            per_question.append(question_result)
+            if trace is not None:
+                traces.append(trace)
         except Exception as exc:  # noqa: BLE001 - one bad question must not sink the run
             errors.append(
                 ExperimentError(question_id=example.id, stage="run", message=repr(exc))
@@ -250,6 +289,17 @@ def run_experiment(
                     question_id=example.id, question=example.question, error=repr(exc)
                 )
             )
+            if config.tracing_enabled:
+                traces.append(
+                    Trace(
+                        trace_id=uuid4().hex,
+                        question=example.question,
+                        question_id=example.id,
+                        started_at=datetime.now(timezone.utc).isoformat(),
+                        performance=PerformanceTrace(),
+                        errors=[repr(exc)],
+                    )
+                )
 
     ok = [q for q in per_question if q.ok]
 
@@ -273,6 +323,7 @@ def run_experiment(
         document_count=ingestion.document_count,
         chunk_count=ingestion.chunk_count,
         per_question=per_question,
+        traces=traces,
         retrieval=aggregate_retrieval_metrics(retrieval_results) if retrieval_results else None,
         generation=aggregate_generation_metrics(generation_results) if generation_results else None,
         faithfulness=(

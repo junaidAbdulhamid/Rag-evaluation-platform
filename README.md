@@ -16,7 +16,7 @@ learning project.
 | 6 | Citation-grounded RAG + citation metrics | ✅ done |
 | 7 | Experiment configuration system | ✅ done |
 | 8 | Experiment tracking (SQLite) | ✅ done |
-| 9 | Observability & tracing | ⬜ |
+| 9 | Observability & tracing | ✅ done |
 | 10 | Latency tracking | ⬜ |
 | 11 | Token & cost tracking | ⬜ |
 | 12 | Experiment comparison | ⬜ |
@@ -57,11 +57,15 @@ app/
     citation_eval.py        per-question + macro/micro aggregate, dataset driver
   experiment/
     config.py               ExperimentConfig - every per-run knob, in one model
-    runner.py               run_experiment(config): wires Phases 1-6, times/meters/costs, saves
+    runner.py               run_experiment(config): wires Phases 1-6, times/meters/costs, traces, saves
     results.py              ExperimentResult + per-question record models
     metering.py             TokenMeter + RecordingTextLLM (evaluation token capture)
-    timing.py / cost.py     stage stopwatch; minimal pricing (Phase 11 expands)
-    store.py                SQLite tracking: columns for querying + JSON for fidelity
+    cost.py                 minimal pricing table (Phase 11 expands)
+    store.py                SQLite tracking: columns for querying + JSON for fidelity (+ traces table)
+  observability/
+    trace.py                Trace model - question / retrieval / generation / evaluation / performance
+    recorder.py             TraceRecorder: context-manager timing, builds a Trace per execution
+    timing.py               record_ms stage stopwatch (shared with the runner)
 data/documents/             sample corpus (6 policy docs)
 data/eval_dataset.json      24 labelled ground-truth questions
 scripts/ask.py              Phase 1 CLI
@@ -111,6 +115,8 @@ python -m scripts.run_experiment --name c300 --chunk-size 300 --top-k 3 --faithf
 
 python -m scripts.experiments list                    # tracked runs, newest first
 python -m scripts.experiments metrics <experiment_id> # full aggregate metrics for one run
+python -m scripts.experiments trace <experiment_id>   # full execution trace for the first question
+python -m scripts.experiments trace <experiment_id> --question q005
 ```
 
 ## Test
