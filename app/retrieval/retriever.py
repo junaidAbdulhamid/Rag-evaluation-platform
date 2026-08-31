@@ -18,6 +18,7 @@ from abc import ABC, abstractmethod
 
 from app.ingestion.embeddings import EmbeddingProvider
 from app.models import RetrievedChunk
+from app.observability.latency import measure
 from app.retrieval.vector_store import VectorStore
 
 
@@ -35,8 +36,10 @@ class DenseRetriever(BaseRetriever):
         self._vector_store = vector_store
 
     def retrieve(self, question: str, top_k: int) -> list[RetrievedChunk]:
-        query_vector = self._embeddings.embed_text(question)
-        hits = self._vector_store.search(query_vector, top_k)
+        with measure("embedding"):
+            query_vector = self._embeddings.embed_text(question)
+        with measure("retrieval"):
+            hits = self._vector_store.search(query_vector, top_k)
         return [
             RetrievedChunk(chunk=chunk, score=score, rank=position)
             for position, (chunk, score) in enumerate(hits, start=1)

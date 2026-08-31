@@ -21,13 +21,17 @@ from app.evaluation.generation import AggregateGenerationMetrics, QuestionGenera
 from app.evaluation.retrieval import AggregateRetrievalMetrics, QuestionRetrievalResult
 from app.experiment.config import ExperimentConfig
 from app.models import TokenUsage
+from app.observability.latency import LatencyReport
 from app.observability.trace import Trace
 
 
 class LatencySummary(BaseModel):
-    """Mean stage latency across all questions, in milliseconds. Phase 10 adds p50/p95."""
+    """Mean stage latency across all questions, in ms. Full mean/median/p95 per
+    stage lives in ``ExperimentResult.latency_report``."""
 
+    embedding_ms: float = 0.0
     retrieval_ms: float = 0.0
+    reranking_ms: float = 0.0
     generation_ms: float = 0.0
     evaluation_ms: float = 0.0
     total_ms: float = 0.0
@@ -81,6 +85,7 @@ class ExperimentResult(BaseModel):
     citation: Optional[AggregateCitationMetrics] = None
 
     latency: LatencySummary = Field(default_factory=LatencySummary)
+    latency_report: Optional[LatencyReport] = None
     total_token_usage: TokenUsage = Field(default_factory=TokenUsage)
     estimated_cost_usd: float = 0.0
     errors: list[ExperimentError] = Field(default_factory=list)

@@ -41,7 +41,8 @@ class RetrievalTrace(BaseModel):
     embedding_model: Optional[str] = None
     embedding_dim: Optional[int] = None
     chunks: list[TracedChunk] = Field(default_factory=list)
-    latency_ms: float = 0.0
+    embedding_ms: float = 0.0
+    latency_ms: float = 0.0  # vector search only; embedding is separate
 
 
 class GenerationTrace(BaseModel):
@@ -64,7 +65,9 @@ class EvaluationTrace(BaseModel):
 
 
 class PerformanceTrace(BaseModel):
+    embedding_ms: float = 0.0
     retrieval_ms: float = 0.0
+    reranking_ms: float = 0.0
     generation_ms: float = 0.0
     evaluation_ms: float = 0.0
     total_ms: float = 0.0

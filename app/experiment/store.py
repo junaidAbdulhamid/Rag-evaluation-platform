@@ -66,10 +66,13 @@ CREATE TABLE IF NOT EXISTS experiments (
     citation_correctness        REAL,
     citation_hallucination_rate REAL,
 
+    latency_embedding_ms  REAL,
     latency_retrieval_ms  REAL,
+    latency_reranking_ms  REAL,
     latency_generation_ms REAL,
     latency_evaluation_ms REAL,
     latency_total_ms      REAL,
+    latency_total_p95_ms  REAL,
 
     prompt_tokens     INTEGER,
     completion_tokens INTEGER,
@@ -295,10 +298,15 @@ class ExperimentStore:
             "citation_precision": _opt(result, "citation", "citation_precision"),
             "citation_correctness": _opt(result, "citation", "citation_correctness"),
             "citation_hallucination_rate": _opt(result, "citation", "citation_hallucination_rate"),
+            "latency_embedding_ms": result.latency.embedding_ms,
             "latency_retrieval_ms": result.latency.retrieval_ms,
+            "latency_reranking_ms": result.latency.reranking_ms,
             "latency_generation_ms": result.latency.generation_ms,
             "latency_evaluation_ms": result.latency.evaluation_ms,
             "latency_total_ms": result.latency.total_ms,
+            "latency_total_p95_ms": (
+                result.latency_report.p95("total") if result.latency_report else None
+            ),
             "prompt_tokens": result.total_token_usage.prompt_tokens,
             "completion_tokens": result.total_token_usage.completion_tokens,
             "total_tokens": result.total_token_usage.total_tokens,

@@ -67,9 +67,16 @@ def cmd_metrics(store: ExperimentStore, args: argparse.Namespace) -> None:
         else:
             for k, v in agg.model_dump().items():
                 print(f"  {k:<26} {v}")
-    lat = result.latency
-    print(f"\n[latency mean ms]\n  retrieval={lat.retrieval_ms:.0f} generation={lat.generation_ms:.0f} "
-          f"evaluation={lat.evaluation_ms:.0f} total={lat.total_ms:.0f}")
+    print("\n[latency ms]")
+    if result.latency_report:
+        print(f"  {'stage':<12} {'mean':>9} {'median':>9} {'p95':>9} {'min':>9} {'max':>9}  n")
+        for stage, st in result.latency_report.stages.items():
+            print(f"  {stage:<12} {st.mean_ms:>9.1f} {st.median_ms:>9.1f} {st.p95_ms:>9.1f} "
+                  f"{st.min_ms:>9.1f} {st.max_ms:>9.1f}  {st.count}")
+    else:
+        lat = result.latency
+        print(f"  (means) retrieval={lat.retrieval_ms:.0f} generation={lat.generation_ms:.0f} "
+              f"evaluation={lat.evaluation_ms:.0f} total={lat.total_ms:.0f}")
 
 
 def cmd_delete(store: ExperimentStore, args: argparse.Namespace) -> None:

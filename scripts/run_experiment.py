@@ -71,9 +71,14 @@ def print_report(result: ExperimentResult) -> None:
         print(f"citations: completeness={ct.citation_completeness:.3f} "
               f"precision={ct.citation_precision:.3f} halluc={ct.citation_hallucination_rate:.3f}")
 
-    lat = result.latency
-    print(f"\nlatency (mean ms): retrieval={lat.retrieval_ms:.0f} generation={lat.generation_ms:.0f} "
-          f"evaluation={lat.evaluation_ms:.0f} total={lat.total_ms:.0f}")
+    print("\nlatency ms (mean / p95):")
+    if result.latency_report:
+        for stage, st in result.latency_report.stages.items():
+            print(f"  {stage:<12} {st.mean_ms:>8.1f} / {st.p95_ms:.1f}")
+    else:
+        lat = result.latency
+        print(f"  retrieval={lat.retrieval_ms:.0f} generation={lat.generation_ms:.0f} "
+              f"evaluation={lat.evaluation_ms:.0f} total={lat.total_ms:.0f}")
     tok = result.total_token_usage
     print(f"tokens: prompt={tok.prompt_tokens} completion={tok.completion_tokens} "
           f"total={tok.total_tokens}")

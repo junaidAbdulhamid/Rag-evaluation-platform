@@ -80,6 +80,7 @@ class TraceRecorder:
             top_k=top_k,
             embedding_model=embedding_model,
             embedding_dim=embedding_dim,
+            embedding_ms=self._latency.get("embedding", 0.0),
             latency_ms=self._latency.get("retrieval", 0.0),
             chunks=[
                 TracedChunk(
@@ -142,7 +143,9 @@ class TraceRecorder:
             generation=self._generation,
             evaluation=self._evaluation,
             performance=PerformanceTrace(
+                embedding_ms=self._latency.get("embedding", 0.0),
                 retrieval_ms=self._latency.get("retrieval", 0.0),
+                reranking_ms=self._latency.get("reranking", 0.0),
                 generation_ms=self._latency.get("generation", 0.0),
                 evaluation_ms=self._latency.get("evaluation", 0.0),
                 total_ms=self._latency.get("total", 0.0),

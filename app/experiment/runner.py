@@ -50,8 +50,8 @@ from app.experiment.results import (
     LatencySummary,
     QuestionExperimentResult,
 )
+from app.observability.latency import LatencyReport, collect_latency, measure
 from app.observability.recorder import TraceRecorder
-from app.observability.timing import record_ms
 from app.observability.trace import PerformanceTrace, Trace
 from app.generation.citation import AnthropicCitedGenerator, CitedGenerator
 from app.generation.generator import AnthropicGenerator, LLMGenerator
@@ -147,24 +147,21 @@ def _generate(question: str, retrieved, config: ExperimentConfig, comps: Experim
 def _run_one(
     example: EvalExample, config: ExperimentConfig, comps: ExperimentComponents
 ) -> tuple[QuestionExperimentResult, Optional[Trace]]:
-    latency: dict = {}
     meter_before = comps.eval_meter.snapshot()
-    recorder = (
-        TraceRecorder(example.question, example.id, latency=latency)
-        if config.tracing_enabled
-        else None
-    )
 
-    with record_ms(latency, "total"):
-        with record_ms(latency, "retrieval"):
-            retrieved = comps.pipeline.retrieve(example.question, config.top_k)
+    with collect_latency() as latency_collector, measure("total"):
+        # DenseRetriever records "embedding" and "retrieval" into the active collector
+        retrieved = comps.pipeline.retrieve(example.question, config.top_k)
 
-        with record_ms(latency, "generation"):
+        with measure("reranking"):
+            pass  # extension point: no reranker yet, but the stage is always timed
+
+        with measure("generation"):
             answer = _generate(example.question, retrieved, config, comps)
             answer_text = answer.answer
             gen_usage = answer.token_usage
 
-        with record_ms(latency, "evaluation"):
+        with measure("evaluation"):
             retrieval_res = (
                 evaluate_retrieval_for_question(retrieved, example, config.top_k)
                 if config.run_retrieval_eval
@@ -194,6 +191,7 @@ def _run_one(
                 else None
             )
 
+    latency = latency_collector.timings
     eval_usage = comps.eval_meter.delta_since(meter_before)
     question_usage = add_usage(eval_usage, gen_usage)
     cost = estimate_cost(gen_usage or TokenUsage(), comps.generation_model) + estimate_cost(
@@ -216,7 +214,8 @@ def _run_one(
     )
 
     trace = None
-    if recorder is not None:
+    if config.tracing_enabled:
+        recorder = TraceRecorder(example.question, example.id, latency=latency)
         recorder.record_retrieval(
             query=example.question,
             retrieved=retrieved,
@@ -331,10 +330,15 @@ def run_experiment(
         ),
         citation=aggregate_citation_metrics(citation_results) if citation_results else None,
         latency=LatencySummary(
+            embedding_ms=_mean(q.latency_ms.get("embedding", 0.0) for q in ok),
             retrieval_ms=_mean(q.latency_ms.get("retrieval", 0.0) for q in ok),
+            reranking_ms=_mean(q.latency_ms.get("reranking", 0.0) for q in ok),
             generation_ms=_mean(q.latency_ms.get("generation", 0.0) for q in ok),
             evaluation_ms=_mean(q.latency_ms.get("evaluation", 0.0) for q in ok),
             total_ms=_mean(q.latency_ms.get("total", 0.0) for q in ok),
+        ),
+        latency_report=(
+            LatencyReport.from_question_timings([q.latency_ms for q in ok]) if ok else None
         ),
         total_token_usage=total_usage,
         estimated_cost_usd=round(sum(q.estimated_cost_usd for q in ok), 6),

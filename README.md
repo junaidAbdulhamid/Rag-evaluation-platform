@@ -17,7 +17,7 @@ learning project.
 | 7 | Experiment configuration system | ✅ done |
 | 8 | Experiment tracking (SQLite) | ✅ done |
 | 9 | Observability & tracing | ✅ done |
-| 10 | Latency tracking | ⬜ |
+| 10 | Latency tracking | ✅ done |
 | 11 | Token & cost tracking | ⬜ |
 | 12 | Experiment comparison | ⬜ |
 | 13 | Failure analysis | ⬜ |
@@ -65,7 +65,8 @@ app/
   observability/
     trace.py                Trace model - question / retrieval / generation / evaluation / performance
     recorder.py             TraceRecorder: context-manager timing, builds a Trace per execution
-    timing.py               record_ms stage stopwatch (shared with the runner)
+    latency.py              contextvar stage timing + mean/median/p95 distribution stats
+    timing.py               record_ms explicit-dict stopwatch (TraceRecorder standalone path)
 data/documents/             sample corpus (6 policy docs)
 data/eval_dataset.json      24 labelled ground-truth questions
 scripts/ask.py              Phase 1 CLI

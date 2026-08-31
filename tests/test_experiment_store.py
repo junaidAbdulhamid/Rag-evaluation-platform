@@ -15,6 +15,7 @@ from app.experiment.results import (
     LatencySummary,
     QuestionExperimentResult,
 )
+from app.observability.latency import LatencyReport
 from app.experiment.store import ExperimentStore
 from app.evaluation.generation import (
     AggregateGenerationMetrics,
@@ -104,7 +105,12 @@ def make_result(experiment_id: str = "exp_1", *, recall: float = 0.9) -> Experim
             abstention_accuracy=1.0, num_with_numbers=1, num_judged=1,
             judge_correctness=0.9, judge_relevance=1.0,
         ),
-        latency=LatencySummary(retrieval_ms=5.0, generation_ms=800.0, evaluation_ms=900.0, total_ms=1705.0),
+        latency=LatencySummary(
+            embedding_ms=2.0, retrieval_ms=3.0, generation_ms=800.0, evaluation_ms=900.0, total_ms=1705.0
+        ),
+        latency_report=LatencyReport.from_question_timings(
+            [{"embedding": 2.0, "retrieval": 3.0, "generation": 800.0, "evaluation": 900.0, "total": 1705.0}]
+        ),
         total_token_usage=TokenUsage(prompt_tokens=100, completion_tokens=20, total_tokens=120),
         estimated_cost_usd=0.001,
         errors=[],
@@ -167,6 +173,12 @@ def test_question_rows_store_queryable_columns(store: ExperimentStore):
     assert row["retrieval_recall"] == 0.9
     assert row["judge_correctness"] == 0.9
     assert row["latency_total_ms"] == 1705.0
+
+    exp_row = store._conn.execute(
+        "SELECT latency_embedding_ms, latency_total_p95_ms FROM experiments WHERE experiment_id='exp_q'"
+    ).fetchone()
+    assert exp_row["latency_embedding_ms"] == 2.0
+    assert exp_row["latency_total_p95_ms"] == 1705.0  # single sample -> p95 == the value
 
 
 def test_delete_cascades_to_question_and_trace_rows(store: ExperimentStore):

@@ -131,6 +131,15 @@ def test_full_run_populates_every_section(corpus_dir: Path):
     assert trace.performance.total_ms >= 0.0
     assert trace.performance.token_usage.total_tokens == 17
 
+    # Phase 10: embedding is split out of retrieval, with distribution stats
+    assert result.latency_report is not None
+    stages = result.latency_report.stages
+    assert "embedding" in stages and "retrieval" in stages  # real DenseRetriever ran
+    assert stages["total"].count == 2
+    assert stages["total"].p95_ms >= stages["total"].median_ms
+    assert trace.retrieval.embedding_ms >= 0.0
+    assert trace.performance.embedding_ms >= 0.0
+
 
 def test_evaluator_toggles_are_respected(corpus_dir: Path):
     comps, _ = build_components()
