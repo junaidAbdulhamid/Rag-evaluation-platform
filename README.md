@@ -14,8 +14,8 @@ learning project.
 | 4 | Generation evaluation (correctness, relevance; LLM-as-judge) | ✅ done |
 | 5 | Faithfulness evaluation (claim extraction + grounding) | ✅ done |
 | 6 | Citation-grounded RAG + citation metrics | ✅ done |
-| 7 | Experiment configuration system | ⬜ |
-| 8 | Experiment tracking (SQLite) | ⬜ |
+| 7 | Experiment configuration system | ✅ done |
+| 8 | Experiment tracking (SQLite) | ✅ done |
 | 9 | Observability & tracing | ⬜ |
 | 10 | Latency tracking | ⬜ |
 | 11 | Token & cost tracking | ⬜ |
@@ -55,6 +55,13 @@ app/
     faithfulness_eval.py    per-question + macro/micro aggregate, dataset driver
     citation.py             citation precision / completeness / correctness / hallucination
     citation_eval.py        per-question + macro/micro aggregate, dataset driver
+  experiment/
+    config.py               ExperimentConfig - every per-run knob, in one model
+    runner.py               run_experiment(config): wires Phases 1-6, times/meters/costs, saves
+    results.py              ExperimentResult + per-question record models
+    metering.py             TokenMeter + RecordingTextLLM (evaluation token capture)
+    timing.py / cost.py     stage stopwatch; minimal pricing (Phase 11 expands)
+    store.py                SQLite tracking: columns for querying + JSON for fidelity
 data/documents/             sample corpus (6 policy docs)
 data/eval_dataset.json      24 labelled ground-truth questions
 scripts/ask.py              Phase 1 CLI
@@ -63,6 +70,8 @@ scripts/eval_retrieval.py   Phase 3 CLI (retrieval metrics + worst questions)
 scripts/eval_generation.py  Phase 4 CLI (deterministic + judge, --no-judge / --limit)
 scripts/eval_faithfulness.py Phase 5 CLI (claim-level grounding, --limit)
 scripts/eval_citations.py   Phase 6 CLI (cited answers + citation metrics, --limit)
+scripts/run_experiment.py   Phase 7 CLI (run one config end to end; saves to the DB)
+scripts/experiments.py      Phase 8 CLI (list / show / metrics / delete tracked runs)
 tests/                      unit tests per module
 ```
 
@@ -96,6 +105,12 @@ python -m scripts.eval_generation --limit 5          # + LLM judge on the first 
 
 python -m scripts.eval_faithfulness --limit 5        # claim-level grounding vs retrieved context
 python -m scripts.eval_citations --limit 5           # cited answers + citation precision/completeness
+
+python -m scripts.run_experiment --name base --limit 5              # one full run -> saved to db
+python -m scripts.run_experiment --name c300 --chunk-size 300 --top-k 3 --faithfulness --limit 5
+
+python -m scripts.experiments list                    # tracked runs, newest first
+python -m scripts.experiments metrics <experiment_id> # full aggregate metrics for one run
 ```
 
 ## Test

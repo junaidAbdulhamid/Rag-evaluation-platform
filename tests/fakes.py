@@ -65,6 +65,23 @@ class EchoGenerator(LLMGenerator):
         )
 
 
+class FixedAnswerGenerator(LLMGenerator):
+    """Returns a constant answer regardless of input. Records calls."""
+
+    def __init__(self, answer: str = "Customers have 30 days to request a refund.") -> None:
+        self.answer = answer
+        self.calls: list[tuple[str, list]] = []
+
+    def generate(self, question: str, retrieved) -> GeneratedAnswer:
+        self.calls.append((question, list(retrieved)))
+        return GeneratedAnswer(
+            answer=self.answer,
+            model="fixed-generator",
+            token_usage=TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
+            prompt="(fixed prompt)",
+        )
+
+
 class FakeTextLLM(TextLLM):
     """Returns scripted responses in order; the last one repeats. Records prompts."""
 

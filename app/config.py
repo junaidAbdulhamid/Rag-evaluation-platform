@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     # --- Data locations ---
     documents_dir: str = "data/documents"
     eval_dataset_path: str = "data/eval_dataset.json"
+    experiments_dir: str = "data/experiments"
+    experiments_db: str = "data/experiments.db"
 
 
 @lru_cache

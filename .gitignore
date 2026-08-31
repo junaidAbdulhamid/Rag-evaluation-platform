@@ -216,3 +216,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Experiment run outputs (Phase 7). Configs under data/experiments/ can be committed;
+# result JSONs are generated. Ignore results, keep hand-written configs explicitly.
+data/experiments/*.json
+!data/experiments/*.config.json
+
+# SQLite experiment-tracking DB (Phase 8) - generated
+data/experiments.db
+*.db
