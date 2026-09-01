@@ -42,12 +42,18 @@ from app.evaluation.retrieval import (
     evaluate_retrieval_for_question,
 )
 from app.experiment.config import ExperimentConfig
-from app.experiment.cost import estimate_cost
+from app.experiment.cost import (
+    apply_configured_pricing,
+    embedding_cost,
+    llm_cost,
+)
 from app.experiment.metering import RecordingTextLLM, TokenMeter, add_usage
 from app.experiment.results import (
+    CostBreakdown,
     ExperimentError,
     ExperimentResult,
     LatencySummary,
+    QuestionCost,
     QuestionExperimentResult,
 )
 from app.observability.latency import LatencyReport, collect_latency, measure
@@ -69,6 +75,7 @@ class ExperimentComponents:
     pipeline: RagPipeline
     generation_model: str
     judge_model: str
+    embedding_model: str
     eval_meter: TokenMeter
     cited_generator: Optional[CitedGenerator] = None
     judge: Optional[GenerationJudge] = None
@@ -112,6 +119,7 @@ def build_experiment_components(
         pipeline=pipeline,
         generation_model=config.generation_model,
         judge_model=config.effective_judge_model,
+        embedding_model=config.embedding_model,
         eval_meter=meter,
         cited_generator=(
             AnthropicCitedGenerator(llm=gen_llm, max_tokens=settings.generation_max_tokens)
@@ -193,9 +201,19 @@ def _run_one(
 
     latency = latency_collector.timings
     eval_usage = comps.eval_meter.delta_since(meter_before)
-    question_usage = add_usage(eval_usage, gen_usage)
-    cost = estimate_cost(gen_usage or TokenUsage(), comps.generation_model) + estimate_cost(
-        eval_usage, comps.judge_model
+    query_embedding_tokens = comps.pipeline.embeddings.count_tokens(example.question)
+    question_usage = add_usage(
+        add_usage(eval_usage, gen_usage), TokenUsage(embedding_tokens=query_embedding_tokens)
+    )
+
+    generation_usd = llm_cost(gen_usage or TokenUsage(), comps.generation_model)
+    evaluation_usd = llm_cost(eval_usage, comps.judge_model)
+    query_embedding_usd = embedding_cost(query_embedding_tokens, comps.embedding_model)
+    question_cost = QuestionCost(
+        query_embedding_usd=query_embedding_usd,
+        generation_usd=generation_usd,
+        evaluation_usd=evaluation_usd,
+        total_usd=query_embedding_usd + generation_usd + evaluation_usd,
     )
 
     result = QuestionExperimentResult(
@@ -210,7 +228,8 @@ def _run_one(
         citation=citation_res,
         latency_ms=latency,
         token_usage=question_usage,
-        estimated_cost_usd=cost,
+        estimated_cost_usd=question_cost.total_usd,
+        cost=question_cost,
     )
 
     trace = None
@@ -237,7 +256,9 @@ def _run_one(
             faithfulness=faithfulness_res.result if faithfulness_res else None,
             citation=citation_res.result if citation_res else None,
         )
-        trace = recorder.build(token_usage=question_usage, estimated_cost_usd=cost)
+        trace = recorder.build(
+            token_usage=question_usage, estimated_cost_usd=question_cost.total_usd
+        )
 
     return result, trace
 
@@ -259,6 +280,7 @@ def run_experiment(
     dataset: Optional[Iterable[EvalExample]] = None,
 ) -> ExperimentResult:
     started = datetime.now(timezone.utc)
+    apply_configured_pricing()
     comps = components or build_experiment_components(config, api_key=api_key)
 
     ingestion = comps.pipeline.ingest(config.documents_dir or settings.documents_dir)
@@ -311,6 +333,20 @@ def run_experiment(
     for q in ok:
         total_usage = add_usage(total_usage, q.token_usage)
 
+    ingestion_embedding_usd = embedding_cost(ingestion.embedding_tokens, config.embedding_model)
+    query_embedding_usd = sum(q.cost.query_embedding_usd for q in ok)
+    generation_usd = sum(q.cost.generation_usd for q in ok)
+    evaluation_usd = sum(q.cost.evaluation_usd for q in ok)
+    marginal = query_embedding_usd + generation_usd + evaluation_usd
+    cost = CostBreakdown(
+        ingestion_embedding_usd=round(ingestion_embedding_usd, 8),
+        query_embedding_usd=round(query_embedding_usd, 8),
+        generation_usd=round(generation_usd, 6),
+        evaluation_usd=round(evaluation_usd, 6),
+        total_usd=round(ingestion_embedding_usd + marginal, 6),
+        cost_per_query_usd=round(marginal / len(ok), 6) if ok else 0.0,
+    )
+
     finished = datetime.now(timezone.utc)
     return ExperimentResult(
         experiment_id=f"{_slugify(config.experiment_name)}_{started.strftime('%Y%m%d-%H%M%S')}",
@@ -341,7 +377,8 @@ def run_experiment(
             LatencyReport.from_question_timings([q.latency_ms for q in ok]) if ok else None
         ),
         total_token_usage=total_usage,
-        estimated_cost_usd=round(sum(q.estimated_cost_usd for q in ok), 6),
+        estimated_cost_usd=cost.total_usd,
+        cost=cost,
         errors=errors,
     )
 

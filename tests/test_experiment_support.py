@@ -1,11 +1,10 @@
-"""Tests for the experiment support pieces: token metering, timing, cost."""
+"""Tests for the experiment support pieces: token metering, timing."""
 
 import time
 
-from app.experiment.cost import estimate_cost
 from app.experiment.metering import RecordingTextLLM, TokenMeter, add_usage
-from app.observability.timing import record_ms
 from app.models import TokenUsage
+from app.observability.timing import record_ms
 from tests.fakes import FakeTextLLM
 
 
@@ -23,10 +22,11 @@ def test_recording_llm_accumulates_usage_into_meter():
     assert meter.delta_since(before).total_tokens == 2
 
 
-def test_add_usage_handles_none():
-    base = TokenUsage(prompt_tokens=1, completion_tokens=2, total_tokens=3)
+def test_add_usage_sums_all_fields_and_handles_none():
+    base = TokenUsage(embedding_tokens=5, prompt_tokens=1, completion_tokens=2, total_tokens=3)
     assert add_usage(base, None) == base
-    assert add_usage(base, base).total_tokens == 6
+    doubled = add_usage(base, base)
+    assert (doubled.embedding_tokens, doubled.total_tokens) == (10, 6)
 
 
 # --- record_ms -------------------------------------------------------------------------
@@ -45,18 +45,3 @@ def test_record_ms_records_even_on_exception():
     except RuntimeError:
         pass
     assert "boom" in store
-
-
-# --- estimate_cost -------------------------------------------------------------------
-def test_estimate_cost_known_model():
-    # opus-5: $5/1M input, $25/1M output
-    usage = TokenUsage(prompt_tokens=1_000_000, completion_tokens=1_000_000, total_tokens=2_000_000)
-    assert estimate_cost(usage, "claude-opus-5") == 30.0
-
-
-def test_estimate_cost_unknown_model_is_zero():
-    assert estimate_cost(TokenUsage(prompt_tokens=999, completion_tokens=999), "mystery") == 0.0
-
-
-def test_estimate_cost_zero_usage():
-    assert estimate_cost(TokenUsage(), "claude-opus-5") == 0.0

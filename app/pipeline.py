@@ -56,6 +56,7 @@ class RagPipeline:
             document_count=len(documents),
             chunk_count=len(chunks),
             document_ids=[doc.document_id for doc in documents],
+            embedding_tokens=sum(self.embeddings.count_tokens(chunk.text) for chunk in chunks),
         )
 
     def retrieve(self, question: str, top_k: int | None = None) -> list[RetrievedChunk]:

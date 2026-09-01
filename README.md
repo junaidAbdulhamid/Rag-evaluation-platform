@@ -18,7 +18,7 @@ learning project.
 | 8 | Experiment tracking (SQLite) | ✅ done |
 | 9 | Observability & tracing | ✅ done |
 | 10 | Latency tracking | ✅ done |
-| 11 | Token & cost tracking | ⬜ |
+| 11 | Token & cost tracking | ✅ done |
 | 12 | Experiment comparison | ⬜ |
 | 13 | Failure analysis | ⬜ |
 | 14 | Dataset slices | ⬜ |
@@ -60,7 +60,7 @@ app/
     runner.py               run_experiment(config): wires Phases 1-6, times/meters/costs, traces, saves
     results.py              ExperimentResult + per-question record models
     metering.py             TokenMeter + RecordingTextLLM (evaluation token capture)
-    cost.py                 minimal pricing table (Phase 11 expands)
+    cost.py                 pricing registry (MODEL_PRICING / EMBEDDING_PRICING) + cost fns; file overrides
     store.py                SQLite tracking: columns for querying + JSON for fidelity (+ traces table)
   observability/
     trace.py                Trace model - question / retrieval / generation / evaluation / performance
@@ -118,6 +118,7 @@ python -m scripts.experiments list                    # tracked runs, newest fir
 python -m scripts.experiments metrics <experiment_id> # full aggregate metrics for one run
 python -m scripts.experiments trace <experiment_id>   # full execution trace for the first question
 python -m scripts.experiments trace <experiment_id> --question q005
+python -m scripts.experiments cost <experiment_id>    # cost breakdown + quality-vs-cost
 ```
 
 ## Test

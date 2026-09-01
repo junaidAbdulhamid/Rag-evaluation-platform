@@ -80,10 +80,20 @@ def print_report(result: ExperimentResult) -> None:
         print(f"  retrieval={lat.retrieval_ms:.0f} generation={lat.generation_ms:.0f} "
               f"evaluation={lat.evaluation_ms:.0f} total={lat.total_ms:.0f}")
     tok = result.total_token_usage
-    print(f"tokens: prompt={tok.prompt_tokens} completion={tok.completion_tokens} "
-          f"total={tok.total_tokens}")
-    print(f"estimated cost: ${result.estimated_cost_usd:.4f}  "
-          f"(${result.estimated_cost_usd / max(result.num_questions, 1):.4f}/question)")
+    print(f"tokens: embedding={tok.embedding_tokens} prompt={tok.prompt_tokens} "
+          f"completion={tok.completion_tokens} total={tok.total_tokens}")
+
+    c = result.cost
+    print("cost (USD):")
+    print(f"  ingestion embedding  ${c.ingestion_embedding_usd:.6f}  (one-time)")
+    print(f"  query embedding      ${c.query_embedding_usd:.6f}")
+    print(f"  generation           ${c.generation_usd:.6f}")
+    print(f"  evaluation           ${c.evaluation_usd:.6f}")
+    print(f"  total                ${c.total_usd:.6f}   ({c.cost_per_query_usd:.6f}/query marginal)")
+
+    qname, qval = result.headline_quality()
+    if qval is not None and c.cost_per_query_usd > 0:
+        print(f"quality vs cost: {qname}={qval:.3f} @ ${c.cost_per_query_usd:.6f}/query")
 
     for err in result.errors:
         print(f"  ERROR {err.question_id}: {err.message}")

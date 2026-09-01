@@ -80,6 +80,7 @@ def build_components(judge: GenerationJudge | None = None) -> tuple[ExperimentCo
         pipeline=pipeline,
         generation_model="claude-opus-5",
         judge_model="claude-opus-5",
+        embedding_model="sentence-transformers/all-MiniLM-L6-v2",
         eval_meter=meter,
         judge=judge or LLMGenerationJudge(RecordingTextLLM(FakeTextLLM(JUDGE_JSON), meter)),
         faithfulness_evaluator=FakeFaithfulnessEvaluator({ANSWER: faith}),
@@ -119,6 +120,18 @@ def test_full_run_populates_every_section(corpus_dir: Path):
     assert q.token_usage.total_tokens == 17
     assert result.total_token_usage.total_tokens == 34
     assert result.estimated_cost_usd > 0.0
+
+    # Phase 11: cost is broken down, tokens include an embedding count
+    assert q.token_usage.embedding_tokens > 0        # query embedding estimate
+    assert q.cost.generation_usd > 0.0 and q.cost.evaluation_usd > 0.0
+    assert q.cost.total_usd == pytest.approx(
+        q.cost.query_embedding_usd + q.cost.generation_usd + q.cost.evaluation_usd
+    )
+    assert result.cost.total_usd == result.estimated_cost_usd
+    assert result.cost.cost_per_query_usd > 0.0
+    # local embedding model is free, so ingestion embedding cost is 0
+    assert result.cost.ingestion_embedding_usd == 0.0
+    assert result.total_token_usage.embedding_tokens > 0
 
     # Phase 9: a full trace per question
     assert len(result.traces) == 2

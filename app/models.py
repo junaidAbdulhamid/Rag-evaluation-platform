@@ -40,8 +40,13 @@ class RetrievedChunk(BaseModel):
 
 
 class TokenUsage(BaseModel):
-    """Token counts for a single model call. Cost estimation (Phase 11) builds on this."""
+    """Token counts for a unit of work. Cost estimation (Phase 11) builds on this.
 
+    `total_tokens` is the LLM total (prompt + completion). `embedding_tokens` is
+    tracked and priced separately - it is *not* included in `total_tokens`.
+    """
+
+    embedding_tokens: int = 0
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
@@ -92,3 +97,4 @@ class IngestionResult(BaseModel):
     document_count: int
     chunk_count: int
     document_ids: list[str]
+    embedding_tokens: int = 0  # estimated tokens embedded across all chunks

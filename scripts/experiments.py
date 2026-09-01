@@ -79,6 +79,26 @@ def cmd_metrics(store: ExperimentStore, args: argparse.Namespace) -> None:
               f"evaluation={lat.evaluation_ms:.0f} total={lat.total_ms:.0f}")
 
 
+def cmd_cost(store: ExperimentStore, args: argparse.Namespace) -> None:
+    result = store.get(args.experiment_id)
+    if result is None:
+        raise SystemExit(f"no such experiment: {args.experiment_id}")
+    c = result.cost
+    tok = result.total_token_usage
+    print(f"{RULE}\nCOST  {result.experiment_id}\n{RULE}")
+    print(f"tokens: embedding={tok.embedding_tokens} prompt={tok.prompt_tokens} "
+          f"completion={tok.completion_tokens} total={tok.total_tokens}")
+    print(f"  ingestion embedding  ${c.ingestion_embedding_usd:.6f}  (one-time)")
+    print(f"  query embedding      ${c.query_embedding_usd:.6f}")
+    print(f"  generation           ${c.generation_usd:.6f}")
+    print(f"  evaluation           ${c.evaluation_usd:.6f}")
+    print(f"  total                ${c.total_usd:.6f}")
+    print(f"  per query (marginal) ${c.cost_per_query_usd:.6f}")
+    qname, qval = result.headline_quality()
+    if qval is not None:
+        print(f"\nquality vs cost: {qname}={qval:.3f}  @  ${c.cost_per_query_usd:.6f}/query")
+
+
 def cmd_delete(store: ExperimentStore, args: argparse.Namespace) -> None:
     if store.delete(args.experiment_id):
         print(f"deleted {args.experiment_id}")
@@ -146,7 +166,9 @@ def main() -> None:
     p_list.add_argument("--limit", type=int, default=50)
     p_list.set_defaults(func=cmd_list)
 
-    for name, func in (("show", cmd_show), ("metrics", cmd_metrics), ("delete", cmd_delete)):
+    for name, func in (
+        ("show", cmd_show), ("metrics", cmd_metrics), ("cost", cmd_cost), ("delete", cmd_delete)
+    ):
         p = sub.add_parser(name)
         p.add_argument("experiment_id")
         p.set_defaults(func=func)

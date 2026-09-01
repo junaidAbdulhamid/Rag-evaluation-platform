@@ -74,10 +74,17 @@ CREATE TABLE IF NOT EXISTS experiments (
     latency_total_ms      REAL,
     latency_total_p95_ms  REAL,
 
+    embedding_tokens  INTEGER,
     prompt_tokens     INTEGER,
     completion_tokens INTEGER,
     total_tokens      INTEGER,
-    estimated_cost_usd REAL,
+
+    cost_ingestion_embedding_usd REAL,
+    cost_query_embedding_usd     REAL,
+    cost_generation_usd          REAL,
+    cost_evaluation_usd          REAL,
+    cost_per_query_usd           REAL,
+    estimated_cost_usd           REAL,
 
     result_json TEXT NOT NULL
 );
@@ -307,9 +314,15 @@ class ExperimentStore:
             "latency_total_p95_ms": (
                 result.latency_report.p95("total") if result.latency_report else None
             ),
+            "embedding_tokens": result.total_token_usage.embedding_tokens,
             "prompt_tokens": result.total_token_usage.prompt_tokens,
             "completion_tokens": result.total_token_usage.completion_tokens,
             "total_tokens": result.total_token_usage.total_tokens,
+            "cost_ingestion_embedding_usd": result.cost.ingestion_embedding_usd,
+            "cost_query_embedding_usd": result.cost.query_embedding_usd,
+            "cost_generation_usd": result.cost.generation_usd,
+            "cost_evaluation_usd": result.cost.evaluation_usd,
+            "cost_per_query_usd": result.cost.cost_per_query_usd,
             "estimated_cost_usd": result.estimated_cost_usd,
             "result_json": result.model_dump_json(),
         }

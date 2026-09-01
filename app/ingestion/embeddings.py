@@ -36,6 +36,14 @@ class EmbeddingProvider(ABC):
     def model_name(self) -> str:
         """Identifier for the underlying model, recorded in traces/experiments."""
 
+    def count_tokens(self, text: str) -> int:
+        """Estimate the token count of `text` (for cost tracking).
+
+        Default: the standard ~4-chars-per-token approximation. A provider backed by
+        a real tokenizer should override this for an exact count.
+        """
+        return max(1, len(text) // 4)
+
 
 class SentenceTransformerEmbeddingProvider(EmbeddingProvider):
     """Local embeddings via the `sentence-transformers` library.
@@ -72,3 +80,7 @@ class SentenceTransformerEmbeddingProvider(EmbeddingProvider):
     @property
     def model_name(self) -> str:
         return self._model_name
+
+    def count_tokens(self, text: str) -> int:
+        """Exact count via the model's own tokenizer (no special tokens)."""
+        return len(self._model.tokenizer.encode(text, add_special_tokens=False))

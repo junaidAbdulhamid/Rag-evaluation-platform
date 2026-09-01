@@ -22,6 +22,7 @@ def add_usage(a: TokenUsage, b: Optional[TokenUsage]) -> TokenUsage:
     if b is None:
         return a
     return TokenUsage(
+        embedding_tokens=a.embedding_tokens + b.embedding_tokens,
         prompt_tokens=a.prompt_tokens + b.prompt_tokens,
         completion_tokens=a.completion_tokens + b.completion_tokens,
         total_tokens=a.total_tokens + b.total_tokens,
@@ -43,6 +44,7 @@ class TokenMeter:
 
     def delta_since(self, before: TokenUsage) -> TokenUsage:
         return TokenUsage(
+            embedding_tokens=self.usage.embedding_tokens - before.embedding_tokens,
             prompt_tokens=self.usage.prompt_tokens - before.prompt_tokens,
             completion_tokens=self.usage.completion_tokens - before.completion_tokens,
             total_tokens=self.usage.total_tokens - before.total_tokens,

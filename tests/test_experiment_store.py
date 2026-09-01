@@ -10,9 +10,11 @@ import pytest
 from app.evaluation.judge import GenerationJudgement
 from app.experiment.config import ExperimentConfig
 from app.experiment.results import (
+    CostBreakdown,
     ExperimentError,
     ExperimentResult,
     LatencySummary,
+    QuestionCost,
     QuestionExperimentResult,
 )
 from app.observability.latency import LatencyReport
@@ -65,8 +67,9 @@ def make_result(experiment_id: str = "exp_1", *, recall: float = 0.9) -> Experim
             ),
         ),
         latency_ms={"retrieval": 5.0, "generation": 800.0, "evaluation": 900.0, "total": 1705.0},
-        token_usage=TokenUsage(prompt_tokens=100, completion_tokens=20, total_tokens=120),
+        token_usage=TokenUsage(embedding_tokens=6, prompt_tokens=100, completion_tokens=20, total_tokens=120),
         estimated_cost_usd=0.001,
+        cost=QuestionCost(generation_usd=0.0007, evaluation_usd=0.0003, total_usd=0.001),
     )
     trace = Trace(
         trace_id=f"{experiment_id}_t1",
@@ -111,8 +114,14 @@ def make_result(experiment_id: str = "exp_1", *, recall: float = 0.9) -> Experim
         latency_report=LatencyReport.from_question_timings(
             [{"embedding": 2.0, "retrieval": 3.0, "generation": 800.0, "evaluation": 900.0, "total": 1705.0}]
         ),
-        total_token_usage=TokenUsage(prompt_tokens=100, completion_tokens=20, total_tokens=120),
+        total_token_usage=TokenUsage(
+            embedding_tokens=48, prompt_tokens=100, completion_tokens=20, total_tokens=120
+        ),
         estimated_cost_usd=0.001,
+        cost=CostBreakdown(
+            ingestion_embedding_usd=0.0, query_embedding_usd=0.0, generation_usd=0.0007,
+            evaluation_usd=0.0003, total_usd=0.001, cost_per_query_usd=0.001,
+        ),
         errors=[],
     )
 
@@ -175,10 +184,14 @@ def test_question_rows_store_queryable_columns(store: ExperimentStore):
     assert row["latency_total_ms"] == 1705.0
 
     exp_row = store._conn.execute(
-        "SELECT latency_embedding_ms, latency_total_p95_ms FROM experiments WHERE experiment_id='exp_q'"
+        "SELECT latency_embedding_ms, latency_total_p95_ms, embedding_tokens, "
+        "cost_generation_usd, cost_per_query_usd FROM experiments WHERE experiment_id='exp_q'"
     ).fetchone()
     assert exp_row["latency_embedding_ms"] == 2.0
     assert exp_row["latency_total_p95_ms"] == 1705.0  # single sample -> p95 == the value
+    assert exp_row["embedding_tokens"] == 48
+    assert exp_row["cost_generation_usd"] == 0.0007
+    assert exp_row["cost_per_query_usd"] == 0.001
 
 
 def test_delete_cascades_to_question_and_trace_rows(store: ExperimentStore):
