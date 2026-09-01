@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 
+from app.experiment.comparison import ComparisonReport, compare_experiments, format_delta
 from app.experiment.store import ExperimentStore
 
 RULE = "=" * 78
@@ -99,6 +100,57 @@ def cmd_cost(store: ExperimentStore, args: argparse.Namespace) -> None:
         print(f"\nquality vs cost: {qname}={qval:.3f}  @  ${c.cost_per_query_usd:.6f}/query")
 
 
+def cmd_compare(store: ExperimentStore, args: argparse.Namespace) -> None:
+    results = []
+    for eid in args.experiment_ids:
+        r = store.get(eid)
+        if r is None:
+            raise SystemExit(f"no such experiment: {eid}")
+        results.append(r)
+    _print_comparison(compare_experiments(results))
+
+
+def _print_comparison(report: ComparisonReport) -> None:
+    ids = report.experiment_ids
+    base = report.baseline_id
+    others = [i for i in ids if i != base]
+
+    print(f"{RULE}\nCOMPARISON  (baseline: {base})\n{RULE}")
+
+    if report.config_diff:
+        print("\nconfig differences:")
+        print(f"  {'field':<20} " + "  ".join(f"{i.split('_')[0][:16]:<18}" for i in ids))
+        for cd in report.config_diff:
+            print(f"  {cd.field:<20} " + "  ".join(f"{str(cd.values[i]):<18}" for i in ids))
+
+    print("\nmetrics:")
+    print(f"  {'metric':<22} {'baseline':>10}   " + "   ".join(f"{o[:22]:>28}" for o in others))
+    for mc in report.metrics:
+        base_val = mc.values[base]
+        base_str = "  -  " if base_val is None else f"{base_val:.4f}"
+        cells = []
+        for o in others:
+            v, d = mc.values[o], mc.deltas.get(o)
+            if v is None:
+                cells.append(f"{'  -  ':>28}")
+            elif d is None:
+                cells.append(f"{v:>10.4f}{'':>18}")
+            else:
+                cells.append(f"{v:>10.4f}  {format_delta(d, mc.unit):>16}")
+        print(f"  {mc.label:<22} {base_str:>10}   " + "   ".join(cells))
+
+    print("\ntradeoffs (relative to baseline):")
+    for t in report.tradeoffs:
+        print(f"\n  {t.experiment_id}: {t.summary}")
+        for g in t.gains:
+            print(f"    + {g}")
+        for loss in t.losses:
+            print(f"    - {loss}")
+
+    print("\n(This report shows tradeoffs; it does not pick a winner - that is a "
+          "quality/cost/latency judgement call.)")
+
+
 def cmd_delete(store: ExperimentStore, args: argparse.Namespace) -> None:
     if store.delete(args.experiment_id):
         print(f"deleted {args.experiment_id}")
@@ -178,6 +230,10 @@ def main() -> None:
     p_trace.add_argument("--question", help="Show only this question's trace.")
     p_trace.add_argument("--all", action="store_true", help="Show every question's trace.")
     p_trace.set_defaults(func=cmd_trace)
+
+    p_compare = sub.add_parser("compare")
+    p_compare.add_argument("experiment_ids", nargs="+", help="Two or more ids; the first is the baseline.")
+    p_compare.set_defaults(func=cmd_compare)
 
     args = parser.parse_args()
     with ExperimentStore() as store:
