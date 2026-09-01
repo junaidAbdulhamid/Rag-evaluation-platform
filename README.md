@@ -22,7 +22,7 @@ learning project.
 | 12 | Experiment comparison | ✅ done |
 | 13 | Failure analysis | ✅ done |
 | 14 | Dataset slices | ✅ done |
-| 15 | Streamlit dashboard | ⬜ |
+| 15 | Streamlit dashboard | ✅ done |
 
 ## Architecture (Phase 1)
 
@@ -79,7 +79,9 @@ scripts/eval_generation.py  Phase 4 CLI (deterministic + judge, --no-judge / --l
 scripts/eval_faithfulness.py Phase 5 CLI (claim-level grounding, --limit)
 scripts/eval_citations.py   Phase 6 CLI (cited answers + citation metrics, --limit)
 scripts/run_experiment.py   Phase 7 CLI (run one config end to end; saves to the DB)
-scripts/experiments.py      Phase 8 CLI (list / show / metrics / delete tracked runs)
+scripts/experiments.py      Phases 8-14 CLI (list / show / metrics / cost / compare / failures / slices / trace)
+dashboard/app.py            Phase 15 Streamlit dashboard (6 sections over the store)
+dashboard/theme.py          dashboard design system - CSS + HTML component helpers
 tests/                      unit tests per module
 ```
 
@@ -127,6 +129,24 @@ python -m scripts.experiments failures <id>           # failure categories + wor
 python -m scripts.experiments failures <id> --category GENERATION_FAILURE --top 10
 python -m scripts.experiments slices <id>             # every metric per slice label + weak-slice flags
 ```
+
+## Dashboard
+
+```bash
+pip install -r requirements-dev.txt      # pulls in streamlit
+streamlit run dashboard/app.py           # http://localhost:8501
+```
+
+Six sections, all reading from `data/experiments.db`: **Overview** (KPI grids +
+latency / cost tables), **Experiments** (the tracked list), **Comparison** (pick 2+,
+direction-aware deltas grouped by metric family + tradeoff cards), **Failures**
+(category pills + worst-N leaderboards, live threshold sliders), **Traces** (a
+stacked stage-timeline + full retrieval / generation / evaluation detail for one
+question), **Slices** (per-label metrics, cells tinted by distance from overall).
+
+The design system lives in `dashboard/theme.py` (CSS + HTML component helpers) and
+`.streamlit/config.toml` (base theme): layered near-black, hairline borders, one
+accent, Inter + JetBrains Mono.
 
 ## Test
 
