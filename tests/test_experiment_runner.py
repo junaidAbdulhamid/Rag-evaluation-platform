@@ -51,10 +51,10 @@ def corpus_dir(tmp_path: Path) -> Path:
 def dataset() -> list[EvalExample]:
     return [
         EvalExample(id="q1", question="How long for a refund?", expected_answer=ANSWER,
-                    relevant_document_ids=["refund_policy"]),
+                    relevant_document_ids=["refund_policy"], slices=["numerical", "policy"]),
         EvalExample(id="q2", question="How fast is shipping?",
                     expected_answer="Three to five business days.",
-                    relevant_document_ids=["shipping_policy"]),
+                    relevant_document_ids=["shipping_policy"], slices=["numerical"]),
     ]
 
 
@@ -106,6 +106,7 @@ def test_full_run_populates_every_section(corpus_dir: Path):
 
     q = result.per_question[0]
     assert q.retrieved_chunk_ids and q.generated_answer == ANSWER
+    assert q.slices == ["numerical", "policy"]  # carried over from the EvalExample
     assert q.retrieval is not None and q.generation is not None
     assert q.faithfulness is not None and q.citation is not None
     assert q.latency_ms["total"] >= 0.0

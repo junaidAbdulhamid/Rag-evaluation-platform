@@ -12,6 +12,7 @@ import argparse
 
 from app.experiment.comparison import ComparisonReport, compare_experiments, format_delta
 from app.experiment.failure_analysis import FailureThresholds, analyze_failures
+from app.experiment.slicing import slice_report, underperforming_slices
 from app.experiment.store import ExperimentStore
 
 RULE = "=" * 78
@@ -192,6 +193,39 @@ def cmd_failures(store: ExperimentStore, args: argparse.Namespace) -> None:
         print(f"  why: {d.reason}")
 
 
+def cmd_slices(store: ExperimentStore, args: argparse.Namespace) -> None:
+    result = store.get(args.experiment_id)
+    if result is None:
+        raise SystemExit(f"no such experiment: {args.experiment_id}")
+
+    report = slice_report(result)
+    cols = ["recall", "precision", "correctness", "faithfulness", "citation_precision"]
+
+    print(f"{RULE}\nSLICE ANALYSIS  {result.experiment_id}\n{RULE}")
+    header = f"  {'slice':<18} {'n':>3}  " + "  ".join(f"{c[:12]:>12}" for c in cols) + "   latency  cost"
+    print(header)
+
+    def row(sm) -> str:
+        cells = []
+        for c in cols:
+            v = sm.metric(c)
+            cells.append(f"{v:>12.3f}" if v is not None else f"{'-':>12}")
+        return (f"  {sm.label:<18} {sm.num_questions:>3}  " + "  ".join(cells)
+                + f"   {sm.latency_total_ms:>7.0f}  ${sm.cost_per_query_usd:.4f}")
+
+    print(row(report.overall))
+    print("  " + "-" * (len(header) - 2))
+    for sm in report.slices:
+        print(row(sm))
+
+    under = underperforming_slices(report, metric=args.metric, min_gap=args.gap)
+    print(f"\nunderperforming on '{args.metric}' (>= {args.gap} below overall):")
+    if not under:
+        print("  none")
+    for u in under:
+        print(f"  {u.label:<18} {u.slice_value:.3f}  (Δ{u.gap:+.3f} vs overall {u.overall_value:.3f})")
+
+
 def cmd_delete(store: ExperimentStore, args: argparse.Namespace) -> None:
     if store.delete(args.experiment_id):
         print(f"deleted {args.experiment_id}")
@@ -283,6 +317,12 @@ def main() -> None:
     p_fail.add_argument("--correctness-min", type=float, default=None)
     p_fail.add_argument("--faithfulness-min", type=float, default=None)
     p_fail.set_defaults(func=cmd_failures)
+
+    p_slice = sub.add_parser("slices")
+    p_slice.add_argument("experiment_id")
+    p_slice.add_argument("--metric", default="recall", help="Metric for the underperformance check.")
+    p_slice.add_argument("--gap", type=float, default=0.05, help="Flag slices this far below overall.")
+    p_slice.set_defaults(func=cmd_slices)
 
     args = parser.parse_args()
     with ExperimentStore() as store:

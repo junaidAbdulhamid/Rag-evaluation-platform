@@ -66,6 +66,7 @@ class CostBreakdown(BaseModel):
 class QuestionExperimentResult(BaseModel):
     question_id: str
     question: str
+    slices: list[str] = Field(default_factory=list)  # slice labels from the EvalExample
     retrieved_chunk_ids: list[str] = Field(default_factory=list)
     retrieved_doc_ids: list[str] = Field(default_factory=list)
     generated_answer: str = ""

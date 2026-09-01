@@ -21,7 +21,7 @@ learning project.
 | 11 | Token & cost tracking | ✅ done |
 | 12 | Experiment comparison | ✅ done |
 | 13 | Failure analysis | ✅ done |
-| 14 | Dataset slices | ⬜ |
+| 14 | Dataset slices | ✅ done |
 | 15 | Streamlit dashboard | ⬜ |
 
 ## Architecture (Phase 1)
@@ -63,6 +63,7 @@ app/
     cost.py                 pricing registry (MODEL_PRICING / EMBEDDING_PRICING) + cost fns; file overrides
     comparison.py           side-by-side metrics, direction-aware deltas, config diff, tradeoffs
     failure_analysis.py     per-question failure category + worst-N leaderboards (read-only)
+    slicing.py              per-slice-label aggregates + underperformance flags (read-only)
     store.py                SQLite tracking: columns for querying + JSON for fidelity (+ traces table)
   observability/
     trace.py                Trace model - question / retrieval / generation / evaluation / performance
@@ -124,6 +125,7 @@ python -m scripts.experiments cost <experiment_id>    # cost breakdown + quality
 python -m scripts.experiments compare <idA> <idB>     # side-by-side deltas + tradeoffs (idA = baseline)
 python -m scripts.experiments failures <id>           # failure categories + worst-N queries
 python -m scripts.experiments failures <id> --category GENERATION_FAILURE --top 10
+python -m scripts.experiments slices <id>             # every metric per slice label + weak-slice flags
 ```
 
 ## Test

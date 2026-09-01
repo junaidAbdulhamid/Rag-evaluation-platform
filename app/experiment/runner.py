@@ -219,6 +219,7 @@ def _run_one(
     result = QuestionExperimentResult(
         question_id=example.id,
         question=example.question,
+        slices=list(example.slices),
         retrieved_chunk_ids=[rc.chunk.chunk_id for rc in retrieved],
         retrieved_doc_ids=sorted({rc.chunk.document_id for rc in retrieved}),
         generated_answer=answer_text,
@@ -307,7 +308,10 @@ def run_experiment(
             )
             per_question.append(
                 QuestionExperimentResult(
-                    question_id=example.id, question=example.question, error=repr(exc)
+                    question_id=example.id,
+                    question=example.question,
+                    slices=list(example.slices),
+                    error=repr(exc),
                 )
             )
             if config.tracing_enabled:
