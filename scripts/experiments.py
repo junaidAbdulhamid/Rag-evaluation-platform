@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 
 from app.experiment.comparison import ComparisonReport, compare_experiments, format_delta
+from app.experiment.failure_analysis import FailureThresholds, analyze_failures
 from app.experiment.store import ExperimentStore
 
 RULE = "=" * 78
@@ -151,6 +152,46 @@ def _print_comparison(report: ComparisonReport) -> None:
           "quality/cost/latency judgement call.)")
 
 
+def cmd_failures(store: ExperimentStore, args: argparse.Namespace) -> None:
+    result = store.get(args.experiment_id)
+    if result is None:
+        raise SystemExit(f"no such experiment: {args.experiment_id}")
+
+    thr = FailureThresholds()
+    if args.correctness_min is not None:
+        thr.correctness_min = args.correctness_min
+    if args.faithfulness_min is not None:
+        thr.faithfulness_min = args.faithfulness_min
+
+    fa = analyze_failures(result, thresholds=thr, top_n=args.top)
+
+    print(f"{RULE}\nFAILURE ANALYSIS  {result.experiment_id}\n{RULE}")
+    print("categories: " + "  ".join(f"{k}={v}" for k, v in sorted(fa.category_counts.items())))
+
+    def leaderboard(title, rows):
+        if not rows:
+            return
+        print(f"\n{title}:")
+        for r in rows:
+            extra = f"  {r.detail}" if r.detail else ""
+            print(f"  {r.question_id:<6} {r.value:<10} {r.question[:60]}{extra}")
+
+    leaderboard("lowest recall", fa.lowest_recall)
+    leaderboard("lowest faithfulness", fa.lowest_faithfulness)
+    leaderboard("lowest correctness", fa.lowest_correctness)
+    leaderboard("highest latency (ms)", fa.highest_latency)
+    leaderboard("highest cost ($)", fa.highest_cost)
+
+    failures = fa.failures
+    if args.category:
+        failures = [d for d in failures if d.category.value == args.category.upper()]
+    print(f"\n{RULE}\nFAILING QUESTIONS ({len(failures)})\n{RULE}")
+    for d in failures:
+        print(f"\n{d.question_id}  [{d.category.value}]")
+        print(f"  Q: {d.question}")
+        print(f"  why: {d.reason}")
+
+
 def cmd_delete(store: ExperimentStore, args: argparse.Namespace) -> None:
     if store.delete(args.experiment_id):
         print(f"deleted {args.experiment_id}")
@@ -234,6 +275,14 @@ def main() -> None:
     p_compare = sub.add_parser("compare")
     p_compare.add_argument("experiment_ids", nargs="+", help="Two or more ids; the first is the baseline.")
     p_compare.set_defaults(func=cmd_compare)
+
+    p_fail = sub.add_parser("failures")
+    p_fail.add_argument("experiment_id")
+    p_fail.add_argument("--top", type=int, default=5, help="Leaderboard size.")
+    p_fail.add_argument("--category", help="Only show failures of this category.")
+    p_fail.add_argument("--correctness-min", type=float, default=None)
+    p_fail.add_argument("--faithfulness-min", type=float, default=None)
+    p_fail.set_defaults(func=cmd_failures)
 
     args = parser.parse_args()
     with ExperimentStore() as store:
