@@ -1,4 +1,3 @@
-# Development dependencies (kept out of the runtime set so a deploy stays lean).
--r requirements.txt
+# Development dependencies: full pipeline + test tooling.
+-r requirements-pipeline.txt
 pytest>=8.0
-streamlit>=1.30    # Phase 15 dashboard: streamlit run dashboard/app.py

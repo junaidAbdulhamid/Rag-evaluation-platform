@@ -1,0 +1,6 @@
+# Full RAG pipeline runtime — everything needed to actually *run* experiments
+# (scripts/run_experiment.py and the app/ pipeline). Heavier: anthropic + a local
+# sentence-transformers model (pulls in torch). Not needed just to view the dashboard.
+-r requirements.txt
+anthropic>=0.49
+sentence-transformers>=3.0

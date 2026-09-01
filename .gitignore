@@ -225,3 +225,6 @@ data/experiments/*.json
 # SQLite experiment-tracking DB (Phase 8) - generated
 data/experiments.db
 *.db
+# ...except the small seed DB the deployed dashboard falls back to.
+!data/demo.db
+.vercel

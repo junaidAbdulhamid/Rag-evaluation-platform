@@ -92,11 +92,19 @@ Flow: `Documents → Loader → Chunker → Embeddings → VectorStore`, then
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements-dev.txt        # runtime + pytest
+pip install -r requirements-dev.txt        # full pipeline + pytest
 cp .env.example .env                        # then paste your ANTHROPIC_API_KEY
 ```
 
 The embedding model (~90 MB) downloads automatically on first use.
+
+Three dependency sets, smallest first:
+
+| File | Contents | Use |
+|------|----------|-----|
+| `requirements.txt` | streamlit, pydantic, numpy | **dashboard only** — the deploy set, no torch |
+| `requirements-pipeline.txt` | + anthropic, sentence-transformers | run experiments (`scripts/`) |
+| `requirements-dev.txt` | + pytest | local development |
 
 ## Run
 
@@ -133,11 +141,15 @@ python -m scripts.experiments slices <id>             # every metric per slice l
 ## Dashboard
 
 ```bash
-pip install -r requirements-dev.txt      # pulls in streamlit
+pip install -r requirements.txt          # lean: streamlit + pydantic + numpy
 streamlit run dashboard/app.py           # http://localhost:8501
 ```
 
-Six sections, all reading from `data/experiments.db`: **Overview** (KPI grids +
+It reads whichever it finds first: `$EXPERIMENTS_DB`, then `data/experiments.db`
+(your local runs), then `data/demo.db` (a committed 3-run seed so a fresh checkout
+or deploy is never empty).
+
+Six sections, all reading from the experiment store: **Overview** (KPI grids +
 latency / cost tables), **Experiments** (the tracked list), **Comparison** (pick 2+,
 direction-aware deltas grouped by metric family + tradeoff cards), **Failures**
 (category pills + worst-N leaderboards, live threshold sliders), **Traces** (a
@@ -147,6 +159,29 @@ question), **Slices** (per-label metrics, cells tinted by distance from overall)
 The design system lives in `dashboard/theme.py` (CSS + HTML component helpers) and
 `.streamlit/config.toml` (base theme): layered near-black, hairline borders, one
 accent, Inter + JetBrains Mono.
+
+## Deploy the dashboard
+
+It's a Streamlit app — a long-lived server with a per-client WebSocket — so it needs
+a host that runs a persistent process. **Serverless platforms (Vercel, Netlify,
+Lambda) can't run it.**
+
+**[Streamlit Community Cloud](https://share.streamlit.io)** (free):
+
+1. Push to GitHub.
+2. New app → pick the repo, branch, and main file `dashboard/app.py`.
+3. Deploy. `requirements.txt` (the lean set) and `.python-version` are picked up
+   automatically; `data/demo.db` seeds the three sample runs.
+
+No secrets required — the dashboard is read-only over the experiment store and never
+calls the API. To point it at your own data, set an `EXPERIMENTS_DB` env var or
+commit a different `.db`.
+
+Any process host works too (Render, Railway, Fly.io) with:
+
+```bash
+streamlit run dashboard/app.py --server.port $PORT --server.address 0.0.0.0
+```
 
 ## Test
 
