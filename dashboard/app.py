@@ -9,8 +9,14 @@ in dashboard/theme.py and .streamlit/config.toml.
 
 from __future__ import annotations
 
+import sys
 from html import escape
+from pathlib import Path
 from typing import Optional
+
+# `streamlit run dashboard/app.py` only puts this file's directory on sys.path,
+# not the repo root - make the `app` / `dashboard` packages importable from anywhere.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import streamlit as st
 
@@ -271,21 +277,20 @@ def failures(r: ExperimentResult) -> None:
     st.markdown(f'<div class="chips">{pills}</div>', unsafe_allow_html=True)
 
     boards = [
-        ("Lowest recall", fa.lowest_recall, False),
-        ("Lowest faithfulness", fa.lowest_faithfulness, False),
-        ("Lowest correctness", fa.lowest_correctness, False),
-        ("Highest latency", fa.highest_latency, True),
-        ("Highest cost", fa.highest_cost, True),
+        ("Lowest recall", fa.lowest_recall, lambda v: f"{v:.3f}"),
+        ("Lowest faithfulness", fa.lowest_faithfulness, lambda v: f"{v:.3f}"),
+        ("Lowest correctness", fa.lowest_correctness, lambda v: f"{v:.3f}"),
+        ("Highest latency", fa.highest_latency, lambda v: f"{v:.0f} ms"),
+        ("Highest cost", fa.highest_cost, lambda v: f"${v:.5f}"),
     ]
     boards = [b for b in boards if b[1]]
     for i in range(0, len(boards), 2):
         cols = st.columns(2)
-        for col, (title, brd, is_ms) in zip(cols, boards[i:i + 2]):
+        for col, (title, brd, fmt) in zip(cols, boards[i:i + 2]):
             with col:
                 theme.sec(title, "Worst 5")
                 rows = [
-                    [theme.mono(rq.question_id), escape(rq.question[:42]),
-                     theme.mono(f"{rq.value:.0f}" if is_ms else f"{rq.value:.3f}")]
+                    [theme.mono(rq.question_id), escape(rq.question[:42]), theme.mono(fmt(rq.value))]
                     for rq in brd
                 ]
                 theme.table(["Q", "Question", "Value"], rows, num_cols=[2])
