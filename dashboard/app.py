@@ -33,10 +33,10 @@ theme.inject()
 SECTIONS = ["Overview", "Experiments", "Comparison", "Failures", "Traces", "Slices"]
 CAT_TONE = {"OK": "pos", "INSUFFICIENT_CONTEXT": "accent", "RETRIEVAL_FAILURE": "neg",
             "GENERATION_FAILURE": "neg", "HALLUCINATION": "neg", "CITATION_FAILURE": "warn", "ERROR": "neg"}
-CAT_COLOR = {"OK": "#3FBE6B", "INSUFFICIENT_CONTEXT": "#7C8CF8", "RETRIEVAL_FAILURE": "#E5544B",
-             "GENERATION_FAILURE": "#E5544B", "HALLUCINATION": "#C77DE0", "CITATION_FAILURE": "#D9A441",
-             "ERROR": "#E5544B"}
-STAGE_C = ["#7C8CF8", "#4CC9C0", "#8A909B", "#E0A458", "#C77DE0"]
+CAT_COLOR = {"OK": "#34D399", "INSUFFICIENT_CONTEXT": "#8B5CF6", "RETRIEVAL_FAILURE": "#F87171",
+             "GENERATION_FAILURE": "#F87171", "HALLUCINATION": "#F472B6", "CITATION_FAILURE": "#FBBF24",
+             "ERROR": "#F87171"}
+STAGE_C = ["#8B5CF6", "#34D399", "#60A5FA", "#FBBF24", "#F472B6"]
 CMP_FAMILIES = [
     ("Retrieval", {"hit_rate", "precision", "recall", "mrr", "ndcg"}),
     ("Generation", {"correctness", "relevance", "exact_match", "token_f1"}),
@@ -128,8 +128,8 @@ def tint(v, ov) -> str:
     if abs(d) < 1e-9:
         return ""
     if d > 0:
-        return f"background:rgba(63,190,107,{min(0.28, 0.07 + d * 1.4):.3f})"
-    return f"background:rgba(229,84,75,{min(0.34, 0.09 + abs(d) * 1.8):.3f})"
+        return f"background:rgba(52,211,153,{min(0.30, 0.08 + d * 1.4):.3f})"
+    return f"background:rgba(248,113,113,{min(0.34, 0.10 + abs(d) * 1.8):.3f})"
 
 
 def _g(agg, attr):
@@ -186,9 +186,9 @@ def overview(r: ExperimentResult) -> None:
         theme.grid(panels, cols=f"repeat({len(panels)}, 1fr)")
 
     cc = r.cost
-    segs = [("generation", cc.generation_usd, "#E0A458"), ("evaluation", cc.evaluation_usd, "#C77DE0"),
-            ("query embed", cc.query_embedding_usd, "#7C8CF8")]
-    segs = [s for s in segs if s[1] > 0] or [("generation", max(cc.total_usd, 1e-9), "#E0A458")]
+    segs = [("generation", cc.generation_usd, "#FBBF24"), ("evaluation", cc.evaluation_usd, "#F472B6"),
+            ("query embed", cc.query_embedding_usd, "#60A5FA")]
+    segs = [s for s in segs if s[1] > 0] or [("generation", max(cc.total_usd, 1e-9), "#FBBF24")]
     c = r.config
     lat = theme.hbar_html("Latency by stage · p95 ms",
                           [(k, s.p95_ms) for k, s in r.latency_report.stages.items() if k != "total"],
@@ -461,7 +461,7 @@ def main() -> None:
         selected = st.selectbox("experiment", ids, label_visibility="collapsed")
         sm = next(s for s in summaries if s["experiment_id"] == selected)
         st.markdown(
-            '<div class="mini">'
+            '<div class="mini"><div class="mh">Selected run</div>'
             f'<div class="mrow">recall<b>{f3(sm.get("retrieval_recall"))}</b></div>'
             f'<div class="mrow">correctness<b>{f3(sm.get("judge_correctness"))}</b></div>'
             f'<div class="mrow">cost<b>${sm.get("estimated_cost_usd") or 0:.4f}</b></div>'
