@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import sys
+from datetime import datetime
 from html import escape
 from pathlib import Path
 from typing import Optional
@@ -30,7 +31,8 @@ from dashboard import theme
 st.set_page_config(page_title="Assay — RAG eval", page_icon="◎", layout="wide", initial_sidebar_state="expanded")
 theme.inject()
 
-SECTIONS = ["Overview", "Experiments", "Comparison", "Failures", "Traces", "Slices"]
+SECTIONS = ["Overview", "Experiments", "Comparison", "Failures", "Traces", "Slices", "New run"]
+RUN_MODELS = ["claude-haiku-4-5", "claude-sonnet-5", "claude-opus-5"]
 CAT_TONE = {"OK": "pos", "INSUFFICIENT_CONTEXT": "accent", "RETRIEVAL_FAILURE": "neg",
             "GENERATION_FAILURE": "neg", "HALLUCINATION": "neg", "CITATION_FAILURE": "warn", "ERROR": "neg"}
 CAT_COLOR = {"OK": "#34D399", "INSUFFICIENT_CONTEXT": "#8B5CF6", "RETRIEVAL_FAILURE": "#F87171",
@@ -426,6 +428,95 @@ def slices(r: ExperimentResult) -> None:
                       theme.delta(f"{u.gap:+.3f}", "regressed")] for u in under], num_cols=[1, 2])
 
 
+# --- new run -----------------------------------------------------------------------------
+def _run_key() -> Optional[str]:
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if not key:
+        try:
+            key = st.secrets.get("ANTHROPIC_API_KEY")  # hosted app: Settings > Secrets
+        except Exception:
+            key = None
+    if not key:
+        try:
+            from app.config import settings
+            key = settings.anthropic_api_key
+        except Exception:
+            key = None
+    return key or None
+
+
+def _pipeline_ready() -> bool:
+    # find_spec, not import — importing sentence_transformers pulls in torch (slow).
+    import importlib.util
+    try:
+        return all(importlib.util.find_spec(m) is not None
+                   for m in ("anthropic", "sentence_transformers"))
+    except Exception:
+        return False
+
+
+def new_experiment() -> None:
+    theme.sec("New experiment", "Runner",
+              "Runs the pipeline live — ingest, retrieve, generate, then the evaluators you pick.")
+    if not _pipeline_ready():
+        theme.empty("Runner not installed here",
+                    "The hosted build ships lean (no torch). On a local checkout:<br>"
+                    "<code>pip install -r requirements-pipeline.txt</code><br>then use this form, or "
+                    "<code>python -m scripts.run_experiment --name demo --limit 5</code>.")
+        return
+
+    key = _run_key()
+    with st.form("new_run"):
+        a, b, c = st.columns(3)
+        name = a.text_input("name", value=datetime.now().strftime("run_%Y%m%d-%H%M"))
+        model = b.selectbox("model", RUN_MODELS)
+        limit = c.number_input("questions", 1, 24, 5, help="Each question makes 1+ live API calls.")
+        d, e, f = st.columns(3)
+        chunk = d.number_input("chunk size", 100, 2000, 500, step=50)
+        overlap = e.number_input("chunk overlap", 0, 400, 50, step=10)
+        top_k = f.number_input("top_k", 1, 20, 4)
+        g, h, i = st.columns(3)
+        judge = g.checkbox("LLM judge", value=True)
+        faith = h.checkbox("faithfulness", value=False)
+        cites = i.checkbox("citations", value=False)
+        go = st.form_submit_button("Run experiment")
+
+    st.caption("Live calls against your Anthropic key — real cost. Keep the question count low while iterating."
+               + ("" if key else "  ·  no ANTHROPIC_API_KEY found"))
+    if not go:
+        return
+    if not key:
+        st.error("No `ANTHROPIC_API_KEY`. Add it to `.env` locally, or "
+                 "**Manage app → Settings → Secrets** on the hosted app.")
+        return
+
+    try:
+        from app.experiment.config import ExperimentConfig
+        from app.experiment.runner import run_experiment
+        cfg = ExperimentConfig(
+            experiment_name=(name or "run").strip(),
+            chunk_size=int(chunk), chunk_overlap=int(overlap), top_k=int(top_k),
+            generation_model=model, citations_enabled=bool(cites),
+            use_judge=bool(judge), run_faithfulness=bool(faith), limit=int(limit),
+        )
+    except Exception as ex:
+        st.error(f"Invalid config: {ex}")
+        return
+
+    try:
+        with st.spinner(f"Running '{cfg.experiment_name}' — live calls, can take a minute…"):
+            result = run_experiment(cfg, api_key=key)
+            with ExperimentStore(DB_PATH) as store:
+                store.save(result)
+    except Exception as ex:
+        st.error(f"Run failed: {ex}")
+        return
+
+    st.cache_data.clear()
+    st.toast(f"Saved {result.experiment_id}", icon="✅")
+    st.rerun()
+
+
 # --- shell --------------------------------------------------------------------------------
 _MARK = (
     '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">'
@@ -447,9 +538,11 @@ def main() -> None:
     if not summaries:
         with st.sidebar:
             _brand()
-        theme.topbar("Overview", right="0 experiments")
+        theme.topbar("New run", right="0 experiments")
         theme.empty("No experiments yet",
-                    "Run one:&nbsp; <code>python -m scripts.run_experiment --name demo --limit 5</code>")
+                    "Create your first run below, or from the CLI: "
+                    "<code>python -m scripts.run_experiment --name demo --limit 5</code>")
+        new_experiment()
         return
 
     ids = [s["experiment_id"] for s in summaries]
@@ -478,6 +571,9 @@ def main() -> None:
         return
     if section == "Comparison":
         comparison(ids)
+        return
+    if section == "New run":
+        new_experiment()
         return
 
     result = result_of(selected)
